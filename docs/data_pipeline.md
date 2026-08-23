@@ -105,6 +105,17 @@ log-likelihood. It persists both Keras models and scaler metadata. A model must
 be trained on observed `target_vote` and `target_fantavoto` values before it can
 serve predictions.
 
+Chronological evaluation trains only on rows before the cutoff matchday and
+scores the remaining rows without using their targets as features:
+
+```bash
+python scripts/evaluate_model.py --season 2024-25 --cutoff-matchday 20
+```
+
+The report includes vote/fantavoto MAE and RMSE, q10/q50/q90 coverage, and the
+q10-q90 interval coverage and width. Use multiple cutoffs for an expanding
+walk-forward study rather than treating one split as a final model verdict.
+
 `LineupOptimizer` requires a price column and enforces the 500-credit default.
 It uses a bounded beam search for legal formations and correlated Monte Carlo
 draws by club before calculating the defence modifier.

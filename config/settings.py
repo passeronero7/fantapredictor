@@ -300,7 +300,7 @@ class Config:
     @classmethod
     def get_season_dir(cls, season: str = None) -> Path:
         """Return the canonical data directory for a compact season code."""
-        season = season or cls.CURRENT_SEASON
+        season = str(season or cls.CURRENT_SEASON).replace('-', '_')
         if len(season) == 4 and season.isdigit():
             season = f'20{season[:2]}_{season[2:]}'
         return DATA_DIR / f'season_{season}'

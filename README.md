@@ -41,6 +41,7 @@ python scripts/run_pipeline.py --stage players --season 2627
 python scripts/run_pipeline.py --stage training-data --season 2627
 python scripts/run_pipeline.py --stage train --season 2627
 python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
+python scripts/evaluate_model.py --season 2425 --cutoff-matchday 20
 ```
 
 When running the core from the private workspace, point it at the workspace
