@@ -1,0 +1,25 @@
+{
+  "league_name": "Example classic Fantacalcio league",
+  "version": "1.0",
+  "event_points": {
+    "goal": 3.0,
+    "assist": 1.0,
+    "yellow_card": -0.5,
+    "red_card": -1.0
+  },
+  "model": {
+    "season_half_life_years": 1.5,
+    "prior_minutes": 1800,
+    "minimum_history_minutes": 180,
+    "max_history_seasons": 6
+  },
+  "unsupported_rules": [
+    "base_vote",
+    "goalkeeper_goals_conceded",
+    "clean_sheet",
+    "penalty_save",
+    "penalty_miss",
+    "own_goal",
+    "defence_modifier"
+  ]
+}
