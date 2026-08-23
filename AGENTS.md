@@ -7,7 +7,7 @@ Build a reproducible, evidence-led Fantacalcio research and prediction project f
 ## Working rules
 
 - Keep `README.md` and `CHANGELOG.md` authoritative.
-- Do not describe unimplemented pipeline stages as working. The codebase implements FBref collection, Understat baseline downloading, empirical-Bayes player confidence scoring, SQLite relational warehouse (`src/db/`), vote processing (`VotesProcessor`), multi-source player merging (`PlayersProcessor`), match dataset preparation (`MatchDataBuilder`), probabilistic SinhArcsinh prediction (`FantacalcioPredictor`), and Monte Carlo lineup optimization (`LineupOptimizer`).
+- Do not describe unimplemented pipeline stages as working. The codebase implements manual FBref export validation, Understat baseline downloading, empirical-Bayes player confidence scoring, SQLite relational warehouse (`src/db/`), vote processing (`VotesProcessor`), multi-source player merging (`PlayersProcessor`), match dataset preparation (`MatchDataBuilder`), probabilistic SinhArcsinh prediction (`FantacalcioPredictor`), and Monte Carlo lineup optimization (`LineupOptimizer`).
 - Use only confirmed transfers for the active roster dataset. Keep rumours in a separate watchlist and never merge them into eligible players.
 - Record a source URL and `checked_at` date for every roster or transfer assertion. The transfer market remains open until 1 September 2026, so refresh before every auction or model run.
 - Keep raw, source-derived data out of Git unless it is small and redistributable. Store generated exports in `data/` (ignored).

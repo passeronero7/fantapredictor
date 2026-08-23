@@ -46,8 +46,9 @@ db.init_schema(conn)
 ## Manual data sources
 
 Some providers block programmatic access. Their data must be exported by hand
-from a browser under `data/season_<season>/manual/` (gitignored). A dedicated
-FBref manual-import adapter remains separate from automated provider loaders.
+from a browser under `data/season_<season>/manual/` (gitignored). The
+`src/data_processing/fbref_manual.py` adapter only validates and loads those
+local exports; it never contacts FBref.
 
 | Source | File to place | Imported into | Notes |
 |---|---|---|---|

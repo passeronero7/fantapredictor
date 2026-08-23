@@ -7,6 +7,10 @@ The project separates network retrieval from local ingestion:
 3. Build the local SQLite warehouse from those snapshots.
 4. Train only on observed ratings and evaluate chronologically.
 
+FBref is the exception to automated downloads. Export the required tables in a
+browser and place them under `data/season_<season>/manual/`; the pipeline only
+validates and reads those local CSVs.
+
 ## Source Downloads
 
 ### Official Fantacalcio ratings

@@ -26,6 +26,8 @@ All notable project changes are recorded here.
 
 ### Changed
 
+- Replaced live FBref scraping, including the Selenium/cloudscraper paths, with
+  a local manual-export validator and removed the `cloudscraper` dependency.
 - Baseline roster snapshots now use the contract-compliant `watchlist` status
   until manual reconciliation promotes a player to `confirmed`.
 - Player merging fails closed for missing/non-confirmed roster status, and the
@@ -36,7 +38,8 @@ All notable project changes are recorded here.
 
 ### Fixed
 
-- Fixed broken exception block in `src/scrapers/fbref_scraper.py` causing syntax/runtime issues with undefined variable `e`.
+- Removed the legacy live FBref scraper path after replacing it with the
+  manual-export validator.
 - Fixed unused `import os` in `config/settings.py` and cleaned up pipeline script references.
 - Fixed per-90 rate metric explosion for low-sample players by introducing Bayesian prior shrinkage in `PlayersProcessor`.
 - Removed synthetic training fallback and prevented same-matchday vote target leakage in `MatchDataBuilder`.

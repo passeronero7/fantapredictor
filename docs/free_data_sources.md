@@ -17,7 +17,8 @@
 
 ## Sources not selected for automation
 
-- **FBref:** the 2026/27 page is valid, but the project’s automated request received HTTP 403 on 23 August. Keep it as a browser-export/manual fallback until access is explicitly reliable.
+- **FBref:** the project does not automate access. Use browser-exported tables
+  under the season `manual/` directory and let the local validator load them.
 - **Sofascore, FotMob, Transfermarkt:** useful for human research but their commonly circulated endpoints are undocumented. Do not make them a production dependency without permission and stable terms.
 - **Commercial APIs:** can improve coverage but are outside the free-first scope.
 
@@ -25,7 +26,7 @@
 
 | URL | Result | Interpretation |
 | --- | --- | --- |
-| `https://fbref.com/en/comps/11/2026-27/stats/Serie-A-Stats` | HTTP 403 through `cloudscraper` | Endpoint recognised but blocked to the current automation route. |
+| `https://fbref.com/en/comps/11/2026-27/stats/Serie-A-Stats` | Manual browser export only | Do not automate access or attempt to bypass access controls. |
 | `https://understat.com/league/Serie_A/2026` | HTTP 200 | Reachable candidate for programmatic analytical data. |
 | `https://www.legaseriea.it/serie-a/statistiche/index` | HTTP 200 | Reachable official reconciliation source. |
 | `https://www.football-data.co.uk/mmz4281/2627/I1.csv` | HTTP 300 | Current-season CSV is not yet usable at that expected location. |

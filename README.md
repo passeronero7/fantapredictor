@@ -5,7 +5,7 @@ An evidence-led probabilistic prediction and research engine for Serie A Fantaca
 ## Current state
 
 The codebase implements:
-- FBref data collection and utility modules (`src/scrapers/`, `src/utils/`).
+- FBref manual-export validation and utility modules (`src/data_processing/`, `src/utils/`).
 - 20-club Serie A roster downloading and open historical stats matching (`scripts/download_baseline_data.py`).
 - Explainable empirical-Bayes pre-season confidence scoring (`src/models/confidence_model.py`).
 - SQLite research warehouse with normalized schema (`src/db/`).
@@ -36,6 +36,7 @@ python scripts/download_match_results.py --start-year 1993 --end-year 2025
 python scripts/build_database.py --db data/fantapredictor.db --season 2627
 
 # Run data pipeline stages
+python scripts/run_pipeline.py --stage manual-fbref --season 2627
 python scripts/run_pipeline.py --stage players --season 2627
 python scripts/run_pipeline.py --stage training-data --season 2627
 python scripts/run_pipeline.py --stage train --season 2627

@@ -10,13 +10,7 @@ class SeasonPathTests(unittest.TestCase):
         self.assertEqual(directory.name, "season_2026_27")
         self.assertEqual(
             config.get_fbref_path("outfield_players.csv", "2627"),
-            directory / "fbref_data" / "outfield_players.csv",
-        )
-
-    def test_fbref_url_targets_2026_27(self):
-        self.assertEqual(
-            config.get_fbref_base_url("2627"),
-            "https://fbref.com/en/comps/11/2026-27/",
+            directory / "manual" / "outfield_players.csv",
         )
 
 

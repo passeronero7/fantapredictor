@@ -18,7 +18,7 @@ class Config:
     # DIRECTORY PATHS
     # ========================
     SEASON_DATA_DIR = DATA_DIR / 'season_2026_27'
-    FBREF_DATA_DIR = SEASON_DATA_DIR / 'fbref_data'
+    FBREF_MANUAL_DIR = SEASON_DATA_DIR / 'manual'
     FANTACALCIO_DIR = SEASON_DATA_DIR / 'fantacalcio'
     MID_OUTPUTS_DIR = SEASON_DATA_DIR / 'mid_outputs'
     OUTPUTS_DIR = SEASON_DATA_DIR / 'outputs'
@@ -58,8 +58,6 @@ class Config:
     # ========================
     # WEB SCRAPING URLs
     # ========================
-    FBREF_SERIE_A_BASE_URL = 'https://fbref.com/en/comps/11/'
-    FBREF_SERIE_A_SUFFIX = '/Serie-A-Stats'
     FANTACALCIO_PROBABLE_LINEUPS_URL = 'https://www.fantacalcio.it/probabili-formazioni-serie-a'
     FANTACALCIO_VOTES_BASE_URL = 'https://www.fantacalcio.it/voti-fantacalcio-serie-a'
     
@@ -305,15 +303,9 @@ class Config:
         return DATA_DIR / f'season_{season}'
 
     @classmethod
-    def get_fbref_base_url(cls, season: str = None) -> str:
-        """Return the FBref competition URL for the requested season."""
-        season_dir = cls.get_season_dir(season).name.removeprefix('season_')
-        return f'{cls.FBREF_SERIE_A_BASE_URL}{season_dir.replace("_", "-")}/'
-
-    @classmethod
     def get_fbref_path(cls, filename: str, season: str = None) -> Path:
-        """Get path for FBref data file."""
-        return cls.get_season_dir(season) / 'fbref_data' / filename
+        """Get path for a manually exported FBref file."""
+        return cls.get_season_dir(season) / 'manual' / filename
     
     @classmethod
     def get_mid_output_path(cls, filename: str, season: str = None) -> Path:
@@ -334,7 +326,7 @@ class Config:
         """Create all necessary directories if they don't exist."""
         season_dir = cls.get_season_dir(season)
         directories = [
-            season_dir / "fbref_data",
+            season_dir / "manual",
             season_dir / "fantacalcio",
             season_dir / "mid_outputs",
             season_dir / "outputs",

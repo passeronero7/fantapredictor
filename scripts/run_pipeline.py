@@ -2,8 +2,8 @@
 """
 Main pipeline orchestrator for Fantacalcio prediction system.
 
-This script coordinates all stages of the data pipeline from scraping
-to prediction generation.
+This script coordinates all stages of the offline data pipeline from local
+source validation to prediction generation.
 """
 
 import argparse
@@ -48,32 +48,25 @@ class FantacalcioPipeline:
         
         logger.info(f"Initialized pipeline for season {self.season}")
     
-    def run_stage_1_scraping(self, force: bool = False):
+    def run_stage_1_manual_fbref(self):
         """
-        Stage 1: Scrape FBRef data.
-        
-        Args:
-            force: Force re-scraping even if data exists
+        Stage 1: Load manually exported FBref data.
         """
-        from src.scrapers.fbref_scraper import FBRefScraper
+        from src.data_processing.fbref_manual import load_manual_exports
         
         logger.info("=" * 60)
-        logger.info("STAGE 1: Scraping FBRef Data")
+        logger.info("STAGE 1: Loading Manual FBref Exports")
         logger.info("=" * 60)
-        
-        outfield_file = config.get_fbref_path(
-            config.OUTFIELD_PLAYERS_FILE, season=self.season
-        )
-        
-        if outfield_file.exists() and not force:
-            logger.info(f"FBRef data already exists at {outfield_file}")
-            logger.info("Use --force to re-scrape")
-            return
-        
-        scraper = FBRefScraper(season=self.season)
-        scraper.scrape_all(save_dir=config.get_season_dir(self.season) / 'fbref_data')
-        
-        logger.info("✓ Stage 1 completed successfully")
+
+        manual_dir = config.get_season_dir(self.season) / "manual"
+        exports = load_manual_exports(manual_dir, self.season)
+        if not exports:
+            logger.warning(f"No manual FBref exports found at {manual_dir}")
+            logger.warning("Export FBref tables in a browser before using FBref features")
+            return exports
+        for category, frame in exports.items():
+            logger.info(f"✓ Loaded {category} export with {len(frame)} rows")
+        return exports
     
     def run_stage_2_votes(self, max_matchday: int = None):
         """
@@ -257,13 +250,12 @@ class FantacalcioPipeline:
             logger.error(f"Error generating predictions: {e}")
             raise
     
-    def run_complete_pipeline(self, matchday: int = None, force_scrape: bool = False):
+    def run_complete_pipeline(self, matchday: int = None):
         """
         Run the complete pipeline from start to finish.
         
         Args:
             matchday: Matchday to predict (None = don't run predictions)
-            force_scrape: Force re-scraping of data
         """
         logger.info("=" * 80)
         logger.info(f"STARTING COMPLETE FANTACALCIO PIPELINE - Season {self.season}")
@@ -272,8 +264,8 @@ class FantacalcioPipeline:
         start_time = datetime.now()
         
         try:
-            # Stage 1: Scraping
-            self.run_stage_1_scraping(force=force_scrape)
+            # Stage 1: Manual FBref exports
+            self.run_stage_1_manual_fbref()
             
             # Stage 2: Votes
             self.run_stage_2_votes()
@@ -320,7 +312,7 @@ def main():
     parser.add_argument(
         '--stage',
         type=str,
-        choices=['scrape', 'votes', 'players', 'training-data', 'train', 'predict', 'all'],
+        choices=['manual-fbref', 'votes', 'players', 'training-data', 'train', 'predict', 'all'],
         default='all',
         help='Pipeline stage to run (default: all)'
     )
@@ -335,12 +327,6 @@ def main():
         '--include-history',
         action='store_true',
         help='Include historical seasons in training'
-    )
-    
-    parser.add_argument(
-        '--force',
-        action='store_true',
-        help='Force re-scraping/re-processing of data'
     )
     
     parser.add_argument(
@@ -361,10 +347,9 @@ def main():
     if args.stage == 'all':
         pipeline.run_complete_pipeline(
             matchday=args.matchday,
-            force_scrape=args.force
         )
-    elif args.stage == 'scrape':
-        pipeline.run_stage_1_scraping(force=args.force)
+    elif args.stage == 'manual-fbref':
+        pipeline.run_stage_1_manual_fbref()
     elif args.stage == 'votes':
         pipeline.run_stage_2_votes()
     elif args.stage == 'players':
