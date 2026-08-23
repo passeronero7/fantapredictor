@@ -32,22 +32,41 @@ class VotesProcessorTests(unittest.TestCase):
         finally:
             tmp_path.unlink(missing_ok=True)
 
-    def test_parse_vote_file_handles_italian_comma_decimals(self):
-        with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False) as tmp:
-            tmp.write(
-                'Codice;Ruolo;Giocatore;Squadra;Voto;Fantavoto\n'
-                '201;A;Rafael Leao;Milan;6,5;9,5\n'
-            )
-            tmp_path = Path(tmp.name)
+    def test_parse_matchday_html_extracts_votes_and_bonuses(self):
+        sample_html = """
+        <table>
+            <tr><th>Inter</th></tr>
+            <tr>
+                <td>
+                    <span class="role" data-value="a"></span>
+                    <a class="player-name">Lautaro Martinez</a>
+                </td>
+                <td>
+                    <div class="pill">
+                        <span class="player-grade" data-value="7,5"></span>
+                        <span class="player-fanta-grade" data-value="10,5"></span>
+                    </div>
+                </td>
+                <td>
+                    <span class="player-bonus" title="Gol segnati" data-value="1"></span>
+                    <span class="player-bonus" title="Assist" data-value="0"></span>
+                    <span class="player-bonus" title="Ammonizioni" data-value="0"></span>
+                    <span class="player-bonus" title="Espulsioni" data-value="0"></span>
+                </td>
+            </tr>
+        </table>
+        """
+        processor = VotesProcessor(season="2627")
+        df = processor.parse_matchday_html(sample_html, season="2024-25", matchday=1)
 
-        try:
-            processor = VotesProcessor(season="2627")
-            df = processor.parse_vote_file(tmp_path, matchday=5)
-            self.assertEqual(len(df), 1)
-            self.assertEqual(df.loc[0, "vote"], 6.5)
-            self.assertEqual(df.loc[0, "fantavoto"], 9.5)
-        finally:
-            tmp_path.unlink(missing_ok=True)
+        self.assertEqual(len(df), 1)
+        row = df.iloc[0]
+        self.assertEqual(row["player"], "Lautaro Martinez")
+        self.assertEqual(row["team"], "Inter")
+        self.assertEqual(row["role"], "A")
+        self.assertEqual(row["vote"], 7.5)
+        self.assertEqual(row["fantavoto"], 10.5)
+        self.assertEqual(row["goals"], 1.0)
 
 
 if __name__ == "__main__":

@@ -28,6 +28,9 @@ python -m unittest discover -s tests -v
 ## Available workflow
 
 ```bash
+# Download official historical matchday votes and ratings
+python scripts/download_historical_votes.py --season 2024-25 --start 1 --end 38
+
 # Run data pipeline stages
 python scripts/run_pipeline.py --stage players --season 2627
 python scripts/run_pipeline.py --stage training-data --season 2627

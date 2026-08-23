@@ -58,6 +58,20 @@ class VotesProcessor:
         self.season_dir = config.get_season_dir(self.season)
         self.votes_dir = self.season_dir / "fantacalcio" / config.VOTES_DIR
 
+    @staticmethod
+    def _clean_grade(raw_val: str, default: float = 6.0) -> float:
+        """Parse raw grade string, normalizing comma decimals and scaling two-digit codes."""
+        if not raw_val or str(raw_val).strip() in {"", "-", "*", "s.v.", "sv", "nan"}:
+            return default
+        cleaned = str(raw_val).replace(",", ".").replace("*", "").strip()
+        try:
+            val = float(cleaned)
+            if val > 30.0:  # e.g. 55 -> 5.5, 60 -> 6.0, 135 -> 13.5
+                val = val / 10.0
+            return val
+        except ValueError:
+            return default
+
     def parse_vote_file(self, filepath: Path, matchday: Optional[int] = None) -> pd.DataFrame:
         """Parse a single Fantacalcio vote file into a cleaned DataFrame."""
         filepath = Path(filepath)
@@ -121,10 +135,13 @@ class VotesProcessor:
             df["team_normalized"] = df["team"].map(normalize_team_name)
 
         # Numeric conversions
-        for num_col in ["vote", "fantavoto", "goals", "goals_conceded", "assists",
+        for grade_col in ["vote", "fantavoto"]:
+            if grade_col in df.columns:
+                df[grade_col] = df[grade_col].map(lambda v: self._clean_grade(v, default=6.0))
+
+        for num_col in ["goals", "goals_conceded", "assists",
                         "yellow_cards", "red_cards", "penalties_saved", "penalties_missed"]:
             if num_col in df.columns:
-                # Handle Italian decimal comma and non-voted players (marked as '*' or '-')
                 df[num_col] = pd.to_numeric(
                     df[num_col].astype(str).str.replace(",", ".").str.replace("*", "", regex=False),
                     errors="coerce",
@@ -167,3 +184,75 @@ class VotesProcessor:
 
         combined = pd.concat(frames, ignore_index=True)
         return combined
+
+    @classmethod
+    def parse_matchday_html(cls, html_content: str, season: str = "2024-25", matchday: int = 1) -> pd.DataFrame:
+        """Parse Fantacalcio.it matchday HTML table containing official votes and bonuses."""
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html_content, "lxml")
+        records = []
+
+        for table in soup.find_all("table"):
+            header = table.find("tr")
+            team_elem = header.find("th") if header else None
+            team_name = team_elem.get_text(strip=True) if team_elem else ""
+
+            for row in table.find_all("tr")[1:]:
+                player_elem = row.find("a", class_="player-name")
+                if not player_elem:
+                    continue
+                player_name = player_elem.get_text(strip=True)
+                role_elem = row.find("span", class_="role")
+                role = role_elem.get("data-value", "").upper() if role_elem else "C"
+
+                grades = row.find_all("span", class_="player-grade")
+                fanta_grades = row.find_all("span", class_="player-fanta-grade")
+
+                vote_raw = grades[0].get("data-value", "") if grades else ""
+                fv_raw = fanta_grades[0].get("data-value", "") if fanta_grades else ""
+
+                vote = cls._clean_grade(vote_raw, default=6.0)
+                fantavoto = cls._clean_grade(fv_raw, default=vote)
+
+                bonuses: dict[str, float] = {}
+                for b in row.find_all("span", class_="player-bonus"):
+                    title = b.get("title", "").strip()
+                    val = b.get("data-value", "0").replace(",", ".")
+                    try:
+                        bonuses[title] = float(val)
+                    except ValueError:
+                        bonuses[title] = 0.0
+
+                records.append({
+                    "season": season,
+                    "matchday": matchday,
+                    "team": team_name,
+                    "player": player_name,
+                    "player_normalized": normalize_name(player_name),
+                    "role": role,
+                    "vote": vote,
+                    "fantavoto": fantavoto,
+                    "goals": bonuses.get("Gol segnati", 0.0),
+                    "goals_conceded": bonuses.get("Gol subiti", 0.0),
+                    "assists": bonuses.get("Assist", 0.0),
+                    "yellow_cards": bonuses.get("Ammonizioni", 0.0),
+                    "red_cards": bonuses.get("Espulsioni", 0.0),
+                    "penalties_saved": bonuses.get("Rigori parati", 0.0),
+                    "penalties_missed": bonuses.get("Rigori sbagliati", 0.0),
+                    "penalties_scored": bonuses.get("Rigori segnati", 0.0),
+                    "own_goals": bonuses.get("Autoreti", 0.0),
+                })
+
+        return pd.DataFrame(records)
+
+    def fetch_online_matchday_votes(self, season_slug: str = "2024-25", matchday: int = 1) -> pd.DataFrame:
+        """Fetch and parse official Fantacalcio.it votes for a given season and matchday."""
+        import requests
+        url = f"https://www.fantacalcio.it/voti-fantacalcio-serie-a/{season_slug}/{matchday}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
+        }
+        res = requests.get(url, headers=headers, timeout=20)
+        res.raise_for_status()
+        return self.parse_matchday_html(res.text, season=season_slug, matchday=matchday)

@@ -120,7 +120,7 @@ class LineupOptimizer:
         selected_fwd = fwds.head(n_fwd)
 
         starters = pd.concat([selected_gk, selected_def, selected_mid, selected_fwd], ignore_index=True)
-        base_points = starters[score_col].sum()
+        base_points = float(pd.to_numeric(starters[score_col], errors="coerce").fillna(0.0).sum()) if not starters.empty else 0.0
 
         # Compute modifier bonus if 4+ defenders in formation
         mod_bonus = 0.0

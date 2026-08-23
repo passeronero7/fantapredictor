@@ -13,6 +13,8 @@ All notable project changes are recorded here.
 - Matchday feature matrix builder (`src/data_processing/match_data_builder.py`) for outfield players and goalkeepers.
 - Probabilistic prediction engine (`src/models/neural_network.py` / `FantacalcioPredictor`) producing expected fantasy points and risk quantiles (floor q10, median q50, ceiling q90).
 - Monte Carlo lineup optimizer (`src/models/lineup_optimizer.py` / `LineupOptimizer`) with formation validation and Italian Serie A *Modificatore Difesa* calculations.
+- Historical Fantacalcio.it vote downloader (`scripts/download_historical_votes.py`) enabling automated retrieval and archiving of official matchday votes, fantavoti, and bonuses/maluses across 11 historical Serie A seasons (2015/16 to present).
+- Multi-source vote parsing engine in `VotesProcessor` supporting both official matchday HTML tables and local spreadsheet files with automatic Italian decimal/grade normalization (e.g. scaling political 55/60 codes).
 - Dual-Repository security architecture and setup guide in `docs/repository_architecture_and_security.md` (Public Core for algorithms, Private Workspace for proprietary data).
 - Automated pre-commit leak-prevention hook (`.githooks/pre-commit`) blocking accidental commits of database files (`.db`, `.sqlite`), spreadsheets (`.xlsx`, `.xls`, `.parquet`), and secret tokens.
 - Hardened `.gitignore` excluding all credentials, database artifacts, private spreadsheets, and runtime logs.

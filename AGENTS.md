@@ -23,6 +23,7 @@ Build a reproducible, evidence-led Fantacalcio research and prediction project f
 
 ```bash
 python -m unittest discover -s tests -v
+python scripts/download_historical_votes.py --season 2024-25 --start 1 --end 38
 python scripts/run_pipeline.py --stage players --season 2627
 python scripts/run_pipeline.py --stage training-data --season 2627
 python scripts/run_pipeline.py --stage train --season 2627

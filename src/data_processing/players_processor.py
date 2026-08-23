@@ -30,10 +30,16 @@ class PlayersProcessor:
     ) -> pd.DataFrame:
         """Merge roster, historical event data (xG/xA), and in-season votes into unified records."""
         # 1. Load active roster
-        if roster_df is None:
+        if roster_df is None or roster_df.empty:
             roster_path = self.season_dir / "rosters" / f"virgilio_rosters_{config.CURRENT_SEASON_FULL}.csv"
             if roster_path.exists():
                 roster_df = pd.read_csv(roster_path)
+            elif votes_df is not None and not votes_df.empty:
+                # Derive unique player roster directly from votes data
+                cols = [c for c in ["player", "player_normalized", "role", "team"] if c in votes_df.columns]
+                unique_players = votes_df.drop_duplicates("player_normalized")[cols].copy()
+                unique_players["status"] = "confirmed"
+                roster_df = unique_players
             else:
                 logger.warning(f"Roster file not found at {roster_path}, attempting fallback.")
                 roster_df = pd.DataFrame(columns=["player", "club_2026_27", "player_normalized", "status"])
