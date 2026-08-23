@@ -119,3 +119,13 @@ walk-forward study rather than treating one split as a final model verdict.
 `LineupOptimizer` requires a price column and enforces the 500-credit default.
 It uses a bounded beam search for legal formations and correlated Monte Carlo
 draws by club before calculating the defence modifier.
+
+Lineup optimization can be run from a saved prediction artifact:
+
+```bash
+python scripts/optimize_lineup.py --season 2627 --matchday 1 \
+  --strategy expected_value --formation 3-4-3
+```
+
+The output contains the selected starters, total cost, budget remaining, base
+points, defence modifier contribution, and simulation q10/q50/q90 results.

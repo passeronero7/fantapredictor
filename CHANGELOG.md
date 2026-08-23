@@ -12,6 +12,8 @@ All notable project changes are recorded here.
   numerical explosions from producing unusable prediction intervals.
 - Added a central-target penalty to the SHASH training objective to stabilize
   point predictions alongside distribution likelihood optimization.
+- Added a first-class lineup optimization CLI/pipeline stage that serializes
+  legal budget-constrained Monte Carlo lineup results.
 - In-depth evaluation of USA football probabilistic modeling (`amiles2233/ff_prob`) and architectural blueprint in `docs/probabilistic_modeling_and_ff_prob_evaluation.md`.
 - Sinh-Arcsinh (SHASH) distribution module (`src/models/distributions.py`) implementing 4-parameter asymmetric, heavy-tailed fantasy scoring density with PDF, CDF, quantile (PPF), sampling (RVS), and MLE fitting.
 - Fantacalcio weekly vote processing engine (`src/data_processing/votes_processor.py`) supporting Italian spreadsheet formats and robust decimal/delimiter parsing.

@@ -7,6 +7,7 @@ source validation to prediction generation.
 """
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
@@ -265,6 +266,30 @@ class FantacalcioPipeline:
         except Exception as e:
             logger.error(f"Error generating predictions: {e}")
             raise
+
+    def run_stage_7_lineup(
+        self,
+        matchday: int,
+        strategy: str = "expected_value",
+        formation: str = config.DEFAULT_FORMATION,
+        budget: float = config.DEFAULT_BUDGET,
+        simulations: int = 1000,
+    ):
+        """Optimize a legal lineup from the requested matchday predictions."""
+        from scripts.optimize_lineup import optimize
+
+        prediction_file = config.get_season_dir(self.season) / "outputs" / f"pred_matchday_{matchday}.xlsx"
+        result = optimize(
+            prediction_file,
+            budget=budget,
+            formation=formation,
+            strategy=strategy,
+            simulations=simulations,
+        )
+        output_file = config.get_season_dir(self.season) / "outputs" / f"lineup_matchday_{matchday}.json"
+        output_file.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        logger.info(f"✓ Optimized lineup saved to {output_file}")
+        return result
     
     def run_complete_pipeline(self, matchday: int = None):
         """
@@ -298,6 +323,7 @@ class FantacalcioPipeline:
             # Stage 6: Predictions (if matchday specified)
             if matchday:
                 self.run_stage_6_predictions(matchday)
+                self.run_stage_7_lineup(matchday)
             
             elapsed = datetime.now() - start_time
             logger.info("=" * 80)
@@ -328,7 +354,7 @@ def main():
     parser.add_argument(
         '--stage',
         type=str,
-        choices=['manual-fbref', 'votes', 'players', 'training-data', 'train', 'predict', 'all'],
+        choices=['manual-fbref', 'votes', 'players', 'training-data', 'train', 'predict', 'lineup', 'all'],
         default='all',
         help='Pipeline stage to run (default: all)'
     )
@@ -337,6 +363,33 @@ def main():
         '--matchday',
         type=int,
         help='Matchday number for predictions'
+    )
+
+    parser.add_argument(
+        '--strategy',
+        choices=['expected_value', 'ceiling', 'floor'],
+        default='expected_value',
+        help='Lineup objective when using the lineup stage'
+    )
+
+    parser.add_argument(
+        '--formation',
+        default=config.DEFAULT_FORMATION,
+        help='Formation for lineup optimization'
+    )
+
+    parser.add_argument(
+        '--budget',
+        type=float,
+        default=config.DEFAULT_BUDGET,
+        help='Credit budget for lineup optimization'
+    )
+
+    parser.add_argument(
+        '--simulations',
+        type=int,
+        default=1000,
+        help='Monte Carlo simulations for lineup optimization'
     )
     
     parser.add_argument(
@@ -379,6 +432,17 @@ def main():
             logger.error("--matchday is required for prediction stage")
             sys.exit(1)
         pipeline.run_stage_6_predictions(args.matchday)
+    elif args.stage == 'lineup':
+        if not args.matchday:
+            logger.error("--matchday is required for lineup stage")
+            sys.exit(1)
+        pipeline.run_stage_7_lineup(
+            args.matchday,
+            strategy=args.strategy,
+            formation=args.formation,
+            budget=args.budget,
+            simulations=args.simulations,
+        )
 
 
 if __name__ == '__main__':
