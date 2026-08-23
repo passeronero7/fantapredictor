@@ -26,6 +26,8 @@ All notable project changes are recorded here.
 
 ### Changed
 
+- Added `FANTAPREDICTOR_DATA_DIR` and warehouse repository readers so the core
+  can run from the private workspace without creating a second data tree.
 - Replaced live FBref scraping, including the Selenium/cloudscraper paths, with
   a local manual-export validator and removed the `cloudscraper` dependency.
 - Baseline roster snapshots now use the contract-compliant `watchlist` status

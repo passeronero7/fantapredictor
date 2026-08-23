@@ -31,7 +31,7 @@ def build(
     understat_path = Path(understat_path or season_dir / "raw" / "understat_players_aggregated_2014_td.csv")
     explicit_votes_dir = votes_dir is not None
     votes_dir = Path(votes_dir or season_dir / "fantacalcio" / config.VOTES_DIR)
-    matches_dir = Path(matches_dir or ROOT / "data" / "raw" / "football-data.co.uk")
+    matches_dir = Path(matches_dir or config.DATA_DIR / "raw" / "football-data.co.uk")
     prices_path = Path(prices_path or season_dir / "fantacalcio" / "prices.csv")
 
     conn = database.get_connection(db_path)
@@ -46,7 +46,7 @@ def build(
             if votes_dir.exists():
                 counts["votes"] = votes.load(conn, votes_dir, season)
         else:
-            vote_directories = sorted(ROOT.glob("data/season_*/fantacalcio/voti"))
+            vote_directories = sorted(config.DATA_DIR.glob("season_*/fantacalcio/voti"))
             for directory in vote_directories:
                 season_name = directory.parts[-3].removeprefix("season_")
                 season_value = season_name.replace("_", "/")
@@ -65,7 +65,7 @@ def build(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--db", type=Path, default=ROOT / "data" / "fantapredictor.db")
+    parser.add_argument("--db", type=Path, default=config.DATA_DIR / "fantapredictor.db")
     parser.add_argument("--season", default="2627")
     parser.add_argument("--roster", type=Path)
     parser.add_argument("--understat", type=Path)

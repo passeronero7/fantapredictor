@@ -13,6 +13,8 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from config.settings import config
+
 
 BASE_URL = "https://www.football-data.co.uk/mmz4281/{season}/I1.csv"
 
@@ -52,7 +54,7 @@ def download(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=ROOT / "data" / "raw" / "football-data.co.uk")
+    parser.add_argument("--output", type=Path, default=config.DATA_DIR / "raw" / "football-data.co.uk")
     parser.add_argument("--start-year", type=int, default=1993)
     parser.add_argument("--end-year", type=int, default=2025)
     parser.add_argument("--delay", type=float, default=1.0)

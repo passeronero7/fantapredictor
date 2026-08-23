@@ -116,7 +116,10 @@ class FantacalcioPipeline:
 
             processor = PlayersProcessor(season=self.season)
             vote_processor = VotesProcessor(season=self.season)
-            votes_df = vote_processor.process_all_matchdays()
+            if config.DATA_DIR.joinpath("fantapredictor.db").exists():
+                votes_df = vote_processor.load_from_database()
+            else:
+                votes_df = vote_processor.process_all_matchdays()
             players_df = processor.merge_all_sources(votes_df=votes_df)
             
             output_file = config.get_mid_output_path(config.PLAYERS_STATS_FILE, season=self.season)
@@ -217,9 +220,13 @@ class FantacalcioPipeline:
             # Build prediction features only from information available before
             # the requested matchday; do not use the target round itself.
             vote_processor = VotesProcessor(season=self.season)
-            prior_votes = vote_processor.process_all_matchdays(
-                max_matchday=max(matchday - 1, 0)
-            )
+            if config.DATA_DIR.joinpath("fantapredictor.db").exists():
+                prior_votes = vote_processor.load_from_database()
+                prior_votes = prior_votes[prior_votes["matchday"] < matchday].copy()
+            else:
+                prior_votes = vote_processor.process_all_matchdays(
+                    max_matchday=max(matchday - 1, 0)
+                )
             players_data = PlayersProcessor(season=self.season).merge_all_sources(
                 votes_df=prior_votes
             )

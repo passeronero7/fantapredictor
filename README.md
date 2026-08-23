@@ -43,6 +43,14 @@ python scripts/run_pipeline.py --stage train --season 2627
 python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
 ```
 
+When running the core from the private workspace, point it at the workspace
+data directory without changing the submodule:
+
+```bash
+FANTAPREDICTOR_DATA_DIR=/path/to/fantapredictor-workspace/data \
+  python fantapredictor_core/scripts/build_database.py
+```
+
 ## Bootstrap the roster database
 
 ```bash

@@ -201,6 +201,23 @@ class VotesProcessor:
             combined = combined.drop_duplicates(available_key, keep="first")
         return combined.reset_index(drop=True)
 
+    def load_from_database(self, db_path: Optional[str | Path] = None) -> pd.DataFrame:
+        """Load this season's votes from the authoritative SQLite warehouse."""
+        from src.db import database, repository
+        from src.db.ingestors.common import season_label
+
+        path = Path(db_path or config.DATA_DIR / "fantapredictor.db")
+        if not path.exists():
+            raise FileNotFoundError(f"SQLite warehouse not found: {path}")
+        conn = database.get_connection(path)
+        try:
+            frame = repository.load_votes(conn)
+        finally:
+            conn.close()
+        if "season" in frame.columns:
+            frame = frame[frame["season"].eq(season_label(self.season))].copy()
+        return frame.reset_index(drop=True)
+
     @classmethod
     def parse_matchday_html(cls, html_content: str, season: str = "2024-25", matchday: int = 1) -> pd.DataFrame:
         """Parse Fantacalcio.it matchday HTML table containing official votes and bonuses."""

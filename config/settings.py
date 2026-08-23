@@ -5,14 +5,17 @@ All file paths, URLs, and model hyperparameters are defined here.
 """
 
 from pathlib import Path
+import os
 
 # Project root directory
 PROJECT_ROOT = Path(__file__).parent.parent
-DATA_DIR = PROJECT_ROOT / 'data'
+DATA_DIR = Path(os.environ.get("FANTAPREDICTOR_DATA_DIR", PROJECT_ROOT / "data")).expanduser()
 
 
 class Config:
     """Main configuration class for the Fantacalcio project."""
+
+    DATA_DIR = DATA_DIR
     
     # ========================
     # DIRECTORY PATHS

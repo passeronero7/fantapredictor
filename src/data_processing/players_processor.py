@@ -20,6 +20,7 @@ class PlayersProcessor:
     def __init__(self, season: Optional[str] = None) -> None:
         self.season = season or config.CURRENT_SEASON
         self.season_dir = config.get_season_dir(self.season)
+        self.db_path = config.DATA_DIR / "fantapredictor.db"
 
     def merge_all_sources(
         self,
@@ -28,9 +29,19 @@ class PlayersProcessor:
         votes_df: Optional[pd.DataFrame] = None,
     ) -> pd.DataFrame:
         """Merge roster, historical event data (xG/xA), and in-season votes into unified records."""
-        # 1. Load active roster
+        # 1. Load active roster and history from SQLite when available.
+        if roster_df is None and self.db_path.exists():
+            from src.db import database, repository
+
+            conn = database.get_connection(self.db_path)
+            try:
+                roster_df = repository.load_rosters(conn, self.season)
+                if history_df is None:
+                    history_df = repository.load_player_history(conn)
+            finally:
+                conn.close()
         if roster_df is None or roster_df.empty:
-            roster_path = self.season_dir / "rosters" / f"virgilio_rosters_{config.CURRENT_SEASON_FULL}.csv"
+            roster_path = self.season_dir / "rosters" / f"virgilio_rosters_{self.season_dir.name.removeprefix('season_')}.csv"
             if roster_path.exists():
                 roster_df = pd.read_csv(roster_path)
             elif votes_df is not None and not votes_df.empty:

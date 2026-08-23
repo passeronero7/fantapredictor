@@ -68,6 +68,10 @@ python scripts/build_database.py \
   --season 2627
 ```
 
+The core accepts `FANTAPREDICTOR_DATA_DIR` so the public submodule can use the
+private workspace's data directory. The warehouse is the intended source for
+pipeline retrieval; raw files are inputs to the builder, not model inputs.
+
 The default build scans all `data/season_*/fantacalcio/voti/` directories, so
 all downloaded historical vote seasons are loaded. It also loads the current
 Understat archive, current roster snapshot, Football-Data match files, and the

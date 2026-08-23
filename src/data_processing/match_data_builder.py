@@ -38,7 +38,10 @@ class MatchDataBuilder:
             Dict with 'outfield' and 'goalkeepers' DataFrames.
         """
         if votes_df is None:
-            votes_df = self.votes_processor.process_all_matchdays()
+            if config.DATA_DIR.joinpath("fantapredictor.db").exists():
+                votes_df = self.votes_processor.load_from_database()
+            else:
+                votes_df = self.votes_processor.process_all_matchdays()
 
         if players_df is None:
             players_df = self.players_processor.merge_all_sources(votes_df=votes_df)

@@ -13,6 +13,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from config.settings import config
 from src.utils.name_matching import normalize_name
 
 
@@ -97,9 +98,10 @@ def analyze(prices_path: str | Path, understat_path: str | Path, recent_seasons:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--prices", type=Path, default=ROOT / "data/season_2026_27/fantacalcio/prices.csv")
-    parser.add_argument("--understat", type=Path, default=ROOT / "data/season_2026_27/raw/understat_players_aggregated_2014_td.csv")
-    parser.add_argument("--output", type=Path, default=ROOT / "data/season_2026_27/outputs/defender_auction_analysis.csv")
+    season_dir = config.get_season_dir("2627")
+    parser.add_argument("--prices", type=Path, default=season_dir / "fantacalcio/prices.csv")
+    parser.add_argument("--understat", type=Path, default=season_dir / "raw/understat_players_aggregated_2014_td.csv")
+    parser.add_argument("--output", type=Path, default=season_dir / "outputs/defender_auction_analysis.csv")
     args = parser.parse_args()
     result = analyze(args.prices, args.understat)
     args.output.parent.mkdir(parents=True, exist_ok=True)
