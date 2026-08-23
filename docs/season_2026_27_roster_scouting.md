@@ -8,7 +8,7 @@ The 20 clubs in the first roster pass are: Atalanta, Bologna, Cagliari, Como, Fi
 
 ## Roster policy
 
-1. Build one record per player in `data/season_2026_27/fantacalcio/rosters_2627.csv` using the data contract in `AGENTS.md`.
+1. Build one record per player in `data/season_2026_27/fantacalcio/rosters_2627.csv` using the data contract in `AGENTS.md`. The automated baseline is a `watchlist` input, not a confirmed roster.
 2. Include only players registered or officially announced by a Serie A club as `confirmed`.
 3. Keep uncompleted negotiations under `watchlist`; do not expose them to model training, auction valuations, or lineup selection.
 4. Reconcile the file with official club squads and the fantasy-platform role list once published. Roles are provider-specific, so do not infer them from a transfer-site position.

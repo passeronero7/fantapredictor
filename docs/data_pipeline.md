@@ -45,12 +45,16 @@ the source provides them.
 
 ### Understat and rosters
 
-The existing baseline downloader creates the current roster snapshot and the
-Understat aggregate archive:
+The existing baseline downloader creates a watchlist roster snapshot and the
+Understat aggregate archive. It does not establish confirmed registration:
 
 ```bash
 python scripts/download_baseline_data.py --season 2627
 ```
+
+Promote only manually reconciled records to `confirmed`, keeping unresolved
+players as `watchlist` or `excluded`. Downstream player processing fails closed
+and admits confirmed records only.
 
 ## Build the Warehouse
 

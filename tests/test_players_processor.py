@@ -31,6 +31,20 @@ class PlayersProcessorTests(unittest.TestCase):
         self.assertEqual(lautaro["season_appearances"], 2)
         self.assertEqual(lautaro["mean_vote"], 6.75)
 
+    def test_merge_exposes_only_confirmed_roster_players(self):
+        roster = pd.DataFrame([
+            {"player": "Confirmed", "player_normalized": "confirmed", "status": "confirmed"},
+            {"player": "Watchlist", "player_normalized": "watchlist", "status": "watchlist"},
+            {"player": "Excluded", "player_normalized": "excluded", "status": "excluded"},
+        ])
+
+        result = PlayersProcessor(season="2627").merge_all_sources(
+            roster_df=roster,
+            history_df=pd.DataFrame(),
+        )
+
+        self.assertEqual(result["player_normalized"].tolist(), ["confirmed"])
+
     def test_match_builder_rejects_missing_observed_targets(self):
         players = pd.DataFrame([{"player": "Player", "role": "D"}])
         with self.assertRaises(ValueError):

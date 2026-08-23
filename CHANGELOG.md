@@ -26,6 +26,10 @@ All notable project changes are recorded here.
 
 ### Changed
 
+- Baseline roster snapshots now use the contract-compliant `watchlist` status
+  until manual reconciliation promotes a player to `confirmed`.
+- Player merging fails closed for missing/non-confirmed roster status, and the
+  roster ingestor validates required provenance fields and status values.
 - Promoted package structure from nested legacy directory `fantacalcio_refactored/` directly to standard root layout (`src/`, `config/`, `scripts/`, `tests/`, `data/`).
 - Removed legacy artifacts (`venvfanta/`, `files.zip`, `DELIVERY_HANDOFF.md`, `DIRECTORY_STRUCTURE.txt`).
 - Updated all execution commands and pipeline imports to run directly from repository root.

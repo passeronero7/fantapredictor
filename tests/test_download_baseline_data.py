@@ -19,7 +19,7 @@ class RosterParsingTests(unittest.TestCase):
 
         self.assertEqual(len(roster), 20)
         self.assertEqual(roster["club_2026_27"].nunique(), 20)
-        self.assertEqual(roster.loc[0, "status"], "provisional")
+        self.assertEqual(roster.loc[0, "status"], "watchlist")
 
 
 if __name__ == "__main__":

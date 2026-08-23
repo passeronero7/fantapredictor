@@ -58,7 +58,9 @@ def parse_rosters(html: str, checked_at: str) -> pd.DataFrame:
                     "player_normalized": normalize_name(player),
                     "source_url": ROSTER_URL,
                     "checked_at": checked_at,
-                    "status": "provisional",
+                    # A public roster listing is not proof of registration or a
+                    # confirmed transfer. Manual reconciliation must promote it.
+                    "status": "watchlist",
                 })
     roster = pd.DataFrame.from_records(records)
     if roster.empty or roster["club_2026_27"].nunique() != len(CLUBS):

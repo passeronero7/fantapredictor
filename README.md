@@ -48,7 +48,7 @@ python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
 .venv/bin/python scripts/download_baseline_data.py --season 2627
 ```
 
-This creates an ignored local snapshot in `data/season_2026_27/`: a 20-club player list, raw Understat archive, matched historical player-season rows, and a coverage report. The snapshot is provisional during the transfer window; it is not a Fantacalcio role or vote list.
+This creates an ignored local snapshot in `data/season_2026_27/`: a 20-club player list, raw Understat archive, matched historical player-season rows, and a coverage report. The roster records are `watchlist` until each player is manually reconciled against official registration/transfer evidence and the fantasy role list; they are not eligible for modelling or auction outputs until promoted to `confirmed`.
 
 ## Player confidence baseline
 

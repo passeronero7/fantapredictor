@@ -89,6 +89,19 @@ class DatabaseIngestorTests(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM match_odds").fetchone()[0], 1)
             connection.close()
 
+    def test_roster_ingestor_rejects_invalid_status(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            roster = root / "roster.csv"
+            roster.write_text(
+                "player,club_2026_27,status,source_url,checked_at\n"
+                "Test Player,Test FC,provisional,https://example.test,2026-08-23\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(ValueError):
+                build(root / "fantapredictor.db", roster_path=roster, season="2627")
+
 
 if __name__ == "__main__":
     unittest.main()

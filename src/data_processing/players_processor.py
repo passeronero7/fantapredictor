@@ -46,6 +46,16 @@ class PlayersProcessor:
         if "player_normalized" not in roster_df.columns and "player" in roster_df.columns:
             roster_df["player_normalized"] = roster_df["player"].map(normalize_name)
 
+        # A player is eligible for modelling only after manual roster
+        # reconciliation. Missing or non-confirmed statuses fail closed.
+        if "status" not in roster_df.columns:
+            logger.warning("Roster has no status column; no players are eligible")
+            roster_df = roster_df.iloc[0:0].copy()
+        else:
+            roster_df = roster_df[
+                roster_df["status"].astype(str).str.lower().eq("confirmed")
+            ].copy()
+
         # 2. Load historical advanced stats (Understat / open league data)
         if history_df is None:
             history_path = self.season_dir / "historical" / "understat_open_league_history_for_roster.csv"

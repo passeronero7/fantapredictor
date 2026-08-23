@@ -12,6 +12,21 @@ from src.db.ingestors.common import club_id, finish_run, player_id, season_label
 def load(conn, path: str | Path, season: str) -> int:
     """Load roster memberships from the existing CSV snapshot."""
     frame = pd.read_csv(path)
+    required_columns = {"player", "source_url", "checked_at", "status"}
+    missing_columns = required_columns - set(frame.columns)
+    if missing_columns:
+        raise ValueError(
+            f"Roster is missing required columns: {', '.join(sorted(missing_columns))}"
+        )
+    for column in ("source_url", "checked_at", "status"):
+        values = frame[column].astype("string")
+        if values.isna().any() or values.str.strip().eq("").any():
+            raise ValueError(f"Every roster assertion must include {column}")
+    invalid_statuses = set(frame["status"].dropna().astype(str)) - {
+        "confirmed", "watchlist", "excluded"
+    }
+    if invalid_statuses:
+        raise ValueError(f"Roster contains invalid statuses: {', '.join(sorted(invalid_statuses))}")
     run_id, _ = start_run(conn, "virgilio")
     label = season_label(season)
     season_id = _season_id(conn, label)
@@ -24,9 +39,7 @@ def load(conn, path: str | Path, season: str) -> int:
                 continue
             cid = club_id(conn, club, "virgilio")
             pid = player_id(conn, name, "virgilio")
-            status = row.get("status", "confirmed")
-            if status not in {"confirmed", "watchlist", "excluded"}:
-                status = "watchlist"
+            status = row["status"]
             conn.execute(
                 """INSERT INTO roster_memberships
                    (player_id, club_id, season_id, status, source_url, checked_at)
