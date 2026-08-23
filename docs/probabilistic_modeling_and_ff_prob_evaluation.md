@@ -88,7 +88,7 @@ Using `football-data.co.uk` and Understat match stats:
 ## 5. Architectural Blueprint
 
 ```
-fantacalcio_refactored/
+fantapredictor/
 ├── src/
 │   ├── models/
 │   │   ├── confidence_model.py     # Empirical-Bayes pre-season baseline (implemented)

@@ -19,11 +19,11 @@ credentials.json
 *secret*
 
 # Generated pipeline data, spreadsheets & runtime output
-fantacalcio_refactored/data/**
-!fantacalcio_refactored/data/season_2026_27/
-!fantacalcio_refactored/data/season_2026_27/.gitkeep
-!fantacalcio_refactored/data/season_2026_27/README.md
-fantacalcio_refactored/fantacalcio.log
+data/**
+!data/season_2026_27/
+!data/season_2026_27/.gitkeep
+!data/season_2026_27/README.md
+fantacalcio.log
 *.log
 *.xlsx
 *.xls
@@ -37,8 +37,7 @@ fantacalcio_refactored/fantacalcio.log
 *.sqlite3
 
 # Manually exported third-party CSVs (never versioned)
-fantacalcio_refactored/data/**/manual/
-data/
+data/**/manual/
 
 # Local editor state and archives
 .idea/

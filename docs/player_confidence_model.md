@@ -25,9 +25,8 @@ This approach is aligned with the hierarchical-Bayesian treatment of Italian fan
 ## Run
 
 ```bash
-cd fantacalcio_refactored
-.venv/bin/python scripts/download_baseline_data.py --season 2627
-.venv/bin/python scripts/build_player_confidence.py --season 2627 \
+python scripts/download_baseline_data.py --season 2627
+python scripts/build_player_confidence.py --season 2627 \
   --rules config/fantacalcio_rules.example.json
 ```
 

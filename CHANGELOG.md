@@ -18,6 +18,12 @@ All notable project changes are recorded here.
 - Hardened `.gitignore` excluding all credentials, database artifacts, private spreadsheets, and runtime logs.
 - Comprehensive unit tests covering distributions, vote parsing, player merging, neural predictor, and lineup optimization (26 passing tests).
 
+### Changed
+
+- Promoted package structure from nested legacy directory `fantacalcio_refactored/` directly to standard root layout (`src/`, `config/`, `scripts/`, `tests/`, `data/`).
+- Removed legacy artifacts (`venvfanta/`, `files.zip`, `DELIVERY_HANDOFF.md`, `DIRECTORY_STRUCTURE.txt`).
+- Updated all execution commands and pipeline imports to run directly from repository root.
+
 ### Fixed
 
 - Fixed broken exception block in `src/scrapers/fbref_scraper.py` causing syntax/runtime issues with undefined variable `e`.

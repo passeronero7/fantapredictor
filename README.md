@@ -4,7 +4,7 @@ An evidence-led probabilistic prediction and research engine for Serie A Fantaca
 
 ## Current state
 
-The usable code is in `fantacalcio_refactored/`. The codebase implements:
+The codebase implements:
 - FBref data collection and utility modules (`src/scrapers/`, `src/utils/`).
 - 20-club Serie A roster downloading and open historical stats matching (`scripts/download_baseline_data.py`).
 - Explainable empirical-Bayes pre-season confidence scoring (`src/models/confidence_model.py`).
@@ -19,7 +19,6 @@ The 2026/27 roster research is a live dataset, not a frozen truth: the summer ma
 ## Setup
 
 ```bash
-cd fantacalcio_refactored
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -29,7 +28,6 @@ python -m unittest discover -s tests -v
 ## Available workflow
 
 ```bash
-cd fantacalcio_refactored
 # Run data pipeline stages
 python scripts/run_pipeline.py --stage players --season 2627
 python scripts/run_pipeline.py --stage training-data --season 2627
@@ -40,7 +38,6 @@ python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
 ## Bootstrap the roster database
 
 ```bash
-cd fantacalcio_refactored
 .venv/bin/python scripts/download_baseline_data.py --season 2627
 ```
 
@@ -71,4 +68,4 @@ See the full setup and future merge guide in [`docs/repository_architecture_and_
 - `AGENTS.md` — working rules, commands, and roster data contract.
 - `CHANGELOG.md` — change history and known limitations.
 - `docs/` — time-stamped research notes, probabilistic modeling evaluation, and security architecture.
-- `fantacalcio_refactored/` — modular Python package.
+- `src/` — modular Python package.

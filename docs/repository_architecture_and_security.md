@@ -105,7 +105,7 @@ git config core.hooksPath .githooks
 The `.gitignore` configuration explicitly excludes all data artifacts, logs, compiled databases, and secrets:
 ```gitignore
 # Data & spreadsheets
-fantacalcio_refactored/data/**
+data/**
 *.xlsx
 *.xls
 *.parquet
