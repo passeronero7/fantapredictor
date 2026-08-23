@@ -1,0 +1,21 @@
+# Python environments and caches
+.venv/
+venv/
+venvfanta/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated pipeline data and runtime output
+fantacalcio_refactored/data/**
+!fantacalcio_refactored/data/season_2026_27/
+!fantacalcio_refactored/data/season_2026_27/.gitkeep
+!fantacalcio_refactored/data/season_2026_27/README.md
+fantacalcio_refactored/fantacalcio.log
+*.log
+
+# Local editor state and archives
+.idea/
+*.zip
