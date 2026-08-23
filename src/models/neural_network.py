@@ -1,8 +1,8 @@
-"""Probabilistic prediction model for Fantacalcio player performance.
+"""Deep probabilistic predictor for Fantacalcio player performance.
 
-Integrates insights from ff_prob: models skewed, fat-tailed fantasy scoring
-distributions using Sinh-Arcsinh (SHASH) parameterization to output both
-expected fantasy points and upside/downside risk quantiles.
+The network predicts two four-parameter Sinh-Arcsinh distributions: one for
+the base vote and one for the final fantasy score. TensorFlow is used directly
+so the model does not depend on the optional TensorFlow Probability package.
 """
 
 from __future__ import annotations
@@ -10,173 +10,291 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Union
+from typing import Optional
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
 
 from config.settings import config
 from src.models.distributions import SinhArcsinhDistribution
-from src.utils.name_matching import normalize_name
 
 logger = logging.getLogger(__name__)
 
 
 class FantacalcioPredictor:
-    """Probabilistic prediction engine for Fantacalcio performance and ratings."""
+    """Train, persist, and serve a deep distributional fantasy-score model."""
 
     def __init__(self, season: Optional[str] = None) -> None:
         self.season = season or config.CURRENT_SEASON
         self.models_dir = config.get_season_dir(self.season) / "outputs" / "models"
         self.models_dir.mkdir(parents=True, exist_ok=True)
-
-        self.outfield_model_vote: Optional[GradientBoostingRegressor] = None
-        self.outfield_model_fv: Optional[GradientBoostingRegressor] = None
-        self.gk_model_vote: Optional[GradientBoostingRegressor] = None
-        self.gk_model_fv: Optional[GradientBoostingRegressor] = None
-
-        self.scaler = StandardScaler()
         self.feature_columns = [
             "hist_minutes",
             "hist_xg",
             "hist_xa",
             "hist_xg_per90",
             "hist_xa_per90",
+            "season_appearances",
+            "mean_vote",
+            "mean_fantavoto",
+            "is_home",
         ]
+        self.scaler = StandardScaler()
+        self.outfield_model = None
+        self.goalkeeper_model = None
+        self.version: Optional[str] = None
         self.is_fitted = False
 
-    def _prepare_features(self, df: pd.DataFrame) -> np.ndarray:
-        """Extract and clean numeric feature matrix."""
-        for col in self.feature_columns:
-            if col not in df.columns:
-                df[col] = 0.0
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+    @staticmethod
+    def _tf():
+        """Import TensorFlow lazily so database and parsing tasks stay lightweight."""
+        try:
+            import tensorflow as tf
+        except ImportError as exc:
+            raise RuntimeError("TensorFlow is required to train or serve the deep model") from exc
+        return tf
 
-        X = df[self.feature_columns].to_numpy(dtype=float)
-        return X
+    def _feature_frame(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Return a numeric feature frame without mutating caller-owned data."""
+        frame = data.copy()
+        for column in self.feature_columns:
+            if column not in frame.columns:
+                frame[column] = 0.0
+            frame[column] = pd.to_numeric(frame[column], errors="coerce").fillna(0.0)
+        return frame[self.feature_columns]
+
+    def _build_model(self):
+        """Build a shared-trunk deep network with vote and fantasy-score heads."""
+        tf = self._tf()
+        inputs = tf.keras.Input(shape=(len(self.feature_columns),), name="features")
+        x = tf.keras.layers.Dense(128, activation="relu")(inputs)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.15)(x)
+        x = tf.keras.layers.Dense(64, activation="relu")(x)
+        x = tf.keras.layers.Dense(32, activation="relu")(x)
+        vote_params = tf.keras.layers.Dense(4, name="vote_distribution")(x)
+        fantasy_params = tf.keras.layers.Dense(4, name="fantasy_distribution")(x)
+        outputs = tf.keras.layers.Concatenate(name="distribution_parameters")(
+            [vote_params, fantasy_params]
+        )
+        model = tf.keras.Model(inputs=inputs, outputs=outputs)
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss=self._loss)
+        return model
+
+    @staticmethod
+    def _log_shash_probability(tf, target, params):
+        """TensorFlow log-density for the SHASH parameterization."""
+        loc, raw_scale, skew, raw_tail = tf.unstack(params, axis=-1)
+        scale = tf.nn.softplus(raw_scale) + 1e-3
+        tail = tf.nn.softplus(raw_tail) + 1e-3
+        z = (target - loc) / scale
+        transformed = tf.sinh(tail * tf.asinh(z) - skew)
+        radius = tail * tf.asinh(z) - skew
+        abs_radius = tf.abs(radius)
+        log_cosh = abs_radius + tf.nn.softplus(-2.0 * abs_radius) - tf.math.log(2.0)
+        return (
+            -0.5 * tf.square(transformed)
+            - 0.5 * tf.math.log(2.0 * np.pi)
+            + tf.math.log(tail)
+            + log_cosh
+            - tf.math.log(scale)
+            - 0.5 * tf.math.log1p(tf.square(z))
+        )
+
+    @classmethod
+    def _loss(cls, y_true, y_pred):
+        """Negative log likelihood for base vote and fantasy score together."""
+        tf = cls._tf()
+        vote_log_prob = cls._log_shash_probability(tf, y_true[:, 0], y_pred[:, :4])
+        fantasy_log_prob = cls._log_shash_probability(tf, y_true[:, 1], y_pred[:, 4:])
+        return tf.reduce_mean(-(vote_log_prob + fantasy_log_prob))
+
+    @staticmethod
+    def _targets(data: pd.DataFrame) -> np.ndarray:
+        """Validate and return real observed targets; synthetic targets are forbidden."""
+        required = {"target_vote", "target_fantavoto"}
+        missing = required - set(data.columns)
+        if missing:
+            raise ValueError(f"Training data is missing targets: {', '.join(sorted(missing))}")
+        targets = data[["target_vote", "target_fantavoto"]].apply(pd.to_numeric, errors="coerce")
+        if targets.isna().any().any():
+            raise ValueError("Training targets contain missing or non-numeric values")
+        if len(targets) < 8:
+            raise ValueError("At least 8 observed player-match rows are required for training")
+        return targets.to_numpy(dtype=np.float32)
 
     def train(
         self,
         outfield_data: pd.DataFrame,
         gk_data: pd.DataFrame,
         epochs: int = 100,
-    ) -> Dict[str, float]:
-        """Train probabilistic regression predictors for outfield players and goalkeepers."""
-        logger.info("Training Fantacalcio predictive models...")
+        batch_size: int = 32,
+    ) -> dict[str, object]:
+        """Train separate deep models using observed vote and fantavoto targets."""
+        if outfield_data.empty and gk_data.empty:
+            raise ValueError("No observed player-match data supplied")
+        frames = [frame for frame in (outfield_data, gk_data) if not frame.empty]
+        all_features = pd.concat([self._feature_frame(frame) for frame in frames], ignore_index=True)
+        self.scaler.fit(all_features)
+        tf = self._tf()
+        tf.keras.utils.set_random_seed(42)
+        histories: dict[str, object] = {}
 
-        # 1. Train Outfield Models
         if not outfield_data.empty:
-            X_outfield = self._prepare_features(outfield_data)
-            y_vote = pd.to_numeric(outfield_data.get("target_vote", 6.0), errors="coerce").fillna(6.0).to_numpy()
-            y_fv = pd.to_numeric(outfield_data.get("target_fantavoto", 6.0), errors="coerce").fillna(6.0).to_numpy()
+            out_targets = self._targets(outfield_data)
+            self.outfield_model = self._build_model()
+            out_features = self.scaler.transform(self._feature_frame(outfield_data)).astype(np.float32)
+            histories["outfield"] = self.outfield_model.fit(
+                out_features,
+                out_targets,
+                epochs=epochs,
+                batch_size=min(batch_size, len(out_targets)),
+                shuffle=False,
+                verbose=0,
+            ).history
 
-            self.outfield_model_vote = GradientBoostingRegressor(
-                n_estimators=min(epochs, 100), max_depth=4, random_state=42
-            )
-            self.outfield_model_vote.fit(X_outfield, y_vote)
-
-            self.outfield_model_fv = GradientBoostingRegressor(
-                n_estimators=min(epochs, 100), max_depth=4, random_state=42
-            )
-            self.outfield_model_fv.fit(X_outfield, y_fv)
-
-        # 2. Train Goalkeeper Models
         if not gk_data.empty:
-            X_gk = self._prepare_features(gk_data)
-            y_vote_gk = pd.to_numeric(gk_data.get("target_vote", 6.0), errors="coerce").fillna(6.0).to_numpy()
-            y_fv_gk = pd.to_numeric(gk_data.get("target_fantavoto", 5.5), errors="coerce").fillna(5.5).to_numpy()
-
-            self.gk_model_vote = GradientBoostingRegressor(
-                n_estimators=min(epochs, 100), max_depth=3, random_state=42
-            )
-            self.gk_model_vote.fit(X_gk, y_vote_gk)
-
-            self.gk_model_fv = GradientBoostingRegressor(
-                n_estimators=min(epochs, 100), max_depth=3, random_state=42
-            )
-            self.gk_model_fv.fit(X_gk, y_fv_gk)
+            gk_targets = self._targets(gk_data)
+            self.goalkeeper_model = self._build_model()
+            gk_features = self.scaler.transform(self._feature_frame(gk_data)).astype(np.float32)
+            histories["goalkeeper"] = self.goalkeeper_model.fit(
+                gk_features,
+                gk_targets,
+                epochs=epochs,
+                batch_size=min(batch_size, len(gk_targets)),
+                shuffle=False,
+                verbose=0,
+            ).history
 
         self.is_fitted = True
-        logger.info("✓ Predictive models successfully trained.")
-        return {"status": "trained", "outfield_samples": len(outfield_data), "gk_samples": len(gk_data)}
+        return {
+            "status": "trained",
+            "model_type": "tensorflow_deep_shash",
+            "outfield_samples": len(outfield_data),
+            "gk_samples": len(gk_data),
+            "histories": histories,
+        }
 
-    def predict_matchday(
-        self,
-        matchday: int,
-        players_data: Optional[pd.DataFrame] = None,
-    ) -> pd.DataFrame:
-        """Generate matchday predictions with SinhArcsinh distribution parameters and quantiles."""
+    @staticmethod
+    def _decode_params(raw: np.ndarray) -> np.ndarray:
+        """Convert unconstrained network outputs to valid distribution parameters."""
+        params = raw.astype(float, copy=True)
+        for scale_column in (1, 5):
+            params[:, scale_column] = np.logaddexp(0.0, params[:, scale_column]) + 1e-3
+        for tail_column in (3, 7):
+            params[:, tail_column] = np.logaddexp(0.0, params[:, tail_column]) + 1e-3
+        params[:, 2] = np.clip(params[:, 2], -5.0, 5.0)
+        params[:, 6] = np.clip(params[:, 6], -5.0, 5.0)
+        return params
+
+    def _predict_params(self, data: pd.DataFrame, goalkeeper: bool) -> np.ndarray:
+        model = self.goalkeeper_model if goalkeeper else self.outfield_model
+        if not self.is_fitted or model is None:
+            role = "goalkeeper" if goalkeeper else "outfield"
+            raise RuntimeError(f"No fitted {role} model is loaded")
+        features = self.scaler.transform(self._feature_frame(data)).astype(np.float32)
+        return self._decode_params(model.predict(features, verbose=0))
+
+    def predict_matchday(self, matchday: int, players_data: Optional[pd.DataFrame] = None) -> pd.DataFrame:
+        """Predict vote/fantasy-score distributions and q10/q50/q90 per player."""
         if players_data is None:
             from src.data_processing.players_processor import PlayersProcessor
-            processor = PlayersProcessor(season=self.season)
-            players_data = processor.merge_all_sources()
-
+            players_data = PlayersProcessor(season=self.season).merge_all_sources()
         if players_data.empty:
             return pd.DataFrame()
 
-        preds_df = players_data.copy()
-        X = self._prepare_features(preds_df)
+        output = players_data.copy().reset_index(drop=True)
+        roles = output.get("role", output.get("primary_position", "M")).astype(str).str.upper()
+        is_gk = roles.isin({"P", "GK", "POR", "GOALKEEPER"})
+        raw_vote = np.zeros((len(output), 4), dtype=float)
+        raw_fantasy = np.zeros((len(output), 4), dtype=float)
+        if (~is_gk).any():
+            params = self._predict_params(output.loc[~is_gk], goalkeeper=False)
+            raw_vote[~is_gk] = params[:, :4]
+            raw_fantasy[~is_gk] = params[:, 4:]
+        if is_gk.any():
+            params = self._predict_params(output.loc[is_gk], goalkeeper=True)
+            raw_vote[is_gk] = params[:, :4]
+            raw_fantasy[is_gk] = params[:, 4:]
 
-        # Determine baseline location parameter (mean expectation)
-        if self.is_fitted and self.outfield_model_fv is not None:
-            pred_loc_outfield = self.outfield_model_fv.predict(X)
-            pred_vote_outfield = self.outfield_model_vote.predict(X)
-        else:
-            # Heuristic default based on player historical xG / xA
-            hist_xg90 = preds_df.get("hist_xg_per90", 0.0).fillna(0.0)
-            hist_xa90 = preds_df.get("hist_xa_per90", 0.0).fillna(0.0)
-            pred_vote_outfield = 6.0 + 0.1 * np.tanh(hist_xg90 + hist_xa90)
-            pred_loc_outfield = pred_vote_outfield + 3.0 * hist_xg90 + 1.0 * hist_xa90
+        output["predicted_vote"] = np.round(raw_vote[:, 0], 2)
+        output["predicted_fantavoto"] = np.round(raw_fantasy[:, 0], 2)
+        output["vote_dist_loc"] = raw_vote[:, 0]
+        output["vote_dist_scale"] = raw_vote[:, 1]
+        output["vote_dist_skewness"] = raw_vote[:, 2]
+        output["vote_dist_tailweight"] = raw_vote[:, 3]
+        output["dist_loc"] = raw_fantasy[:, 0]
+        output["dist_scale"] = raw_fantasy[:, 1]
+        output["dist_skewness"] = raw_fantasy[:, 2]
+        output["dist_tailweight"] = raw_fantasy[:, 3]
 
-        preds_df["predicted_vote"] = np.round(pred_vote_outfield, 2)
-        preds_df["predicted_fantavoto"] = np.round(pred_loc_outfield, 2)
-
-        # Probabilistic SinhArcsinh parameterization (adapted from ff_prob)
-        # Attackers have positive skewness (right tail for goals); defenders have near-zero skew
-        role_str = preds_df.get("role", preds_df.get("primary_position", "M")).astype(str).str.upper()
-        skewness_vec = np.where(role_str.isin(["F", "A", "ATT"]), 0.45, np.where(role_str.isin(["C", "M", "CC"]), 0.20, 0.0))
-        scale_vec = np.where(role_str.isin(["F", "A", "ATT"]), 1.8, np.where(role_str.isin(["P", "GK"]), 1.5, 1.1))
-        tailweight_vec = np.full(len(preds_df), 1.0)
-
-        preds_df["dist_loc"] = preds_df["predicted_fantavoto"]
-        preds_df["dist_scale"] = scale_vec
-        preds_df["dist_skewness"] = skewness_vec
-        preds_df["dist_tailweight"] = tailweight_vec
-
-        # Calculate quantiles: 10th (floor), 50th (median), 90th (ceiling upside)
-        q10_list, q50_list, q90_list = [], [], []
-        for loc, scale, skew, tail in zip(preds_df["dist_loc"], scale_vec, skewness_vec, tailweight_vec):
-            dist = SinhArcsinhDistribution(loc=loc, scale=scale, skewness=skew, tailweight=tail)
-            q10_list.append(round(float(dist.ppf(0.10)), 2))
-            q50_list.append(round(float(dist.ppf(0.50)), 2))
-            q90_list.append(round(float(dist.ppf(0.90)), 2))
-
-        preds_df["floor_q10"] = q10_list
-        preds_df["median_q50"] = q50_list
-        preds_df["ceiling_q90"] = q90_list
-        preds_df["predicted_matchday"] = matchday
-
-        return preds_df
+        quantiles = np.array([
+            SinhArcsinhDistribution(*params).ppf([0.10, 0.50, 0.90])
+            for params in zip(
+                output["dist_loc"],
+                output["dist_scale"],
+                output["dist_skewness"],
+                output["dist_tailweight"],
+            )
+        ])
+        output[["floor_q10", "median_q50", "ceiling_q90"]] = np.round(quantiles, 2)
+        output["predicted_matchday"] = matchday
+        return output
 
     def save_model(self, version: str) -> Path:
-        """Save fitted model metadata and weights."""
-        meta = {
+        """Persist models, scaler parameters, and metadata in a reproducible bundle."""
+        if not self.is_fitted:
+            raise RuntimeError("Cannot save an unfitted model")
+        if self.outfield_model is None and self.goalkeeper_model is None:
+            raise RuntimeError("No fitted model exists")
+        artifacts = {}
+        if self.outfield_model is not None:
+            path = self.models_dir / f"model_{version}_outfield.keras"
+            self.outfield_model.save(path)
+            artifacts["outfield"] = path.name
+        if self.goalkeeper_model is not None:
+            path = self.models_dir / f"model_{version}_goalkeeper.keras"
+            self.goalkeeper_model.save(path)
+            artifacts["goalkeeper"] = path.name
+        metadata = {
             "version": version,
             "season": self.season,
+            "model_type": "tensorflow_deep_shash",
             "feature_columns": self.feature_columns,
-            "is_fitted": self.is_fitted,
+            "scaler_mean": self.scaler.mean_.tolist(),
+            "scaler_scale": self.scaler.scale_.tolist(),
+            "artifacts": artifacts,
         }
-        filepath = self.models_dir / f"model_meta_{version}.json"
-        filepath.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-        return filepath
+        metadata_path = self.models_dir / f"model_meta_{version}.json"
+        metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+        self.version = version
+        return metadata_path
 
     def load_latest_model(self) -> None:
-        """Load latest model version metadata."""
-        meta_files = sorted(list(self.models_dir.glob("model_meta_*.json")))
-        if meta_files:
-            latest = meta_files[-1]
-            meta = json.loads(latest.read_text(encoding="utf-8"))
-            self.is_fitted = meta.get("is_fitted", False)
-            logger.info(f"Loaded model version {meta.get('version')}")
+        """Restore the newest complete model bundle, including scaler state."""
+        metadata_files = sorted(self.models_dir.glob("model_meta_*.json"))
+        if not metadata_files:
+            raise FileNotFoundError(f"No model metadata found in {self.models_dir}")
+        metadata_path = metadata_files[-1]
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        tf = self._tf()
+        artifacts = metadata.get("artifacts", {})
+        if not artifacts:
+            raise ValueError(f"Model metadata has no serialized artifacts: {metadata_path}")
+        self.outfield_model = (
+            tf.keras.models.load_model(self.models_dir / artifacts["outfield"], compile=False)
+            if "outfield" in artifacts else None
+        )
+        self.goalkeeper_model = (
+            tf.keras.models.load_model(self.models_dir / artifacts["goalkeeper"], compile=False)
+            if "goalkeeper" in artifacts else None
+        )
+        self.feature_columns = metadata["feature_columns"]
+        self.scaler.mean_ = np.asarray(metadata["scaler_mean"], dtype=float)
+        self.scaler.scale_ = np.asarray(metadata["scaler_scale"], dtype=float)
+        self.scaler.var_ = self.scaler.scale_ ** 2
+        self.scaler.n_features_in_ = len(self.feature_columns)
+        self.scaler.feature_names_in_ = np.asarray(self.feature_columns, dtype=object)
+        self.version = metadata["version"]
+        self.is_fitted = True

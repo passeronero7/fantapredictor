@@ -1,6 +1,6 @@
-# Fantacalcio DB layer
+# FantaPredictor DB layer
 
-Normalized SQLite research warehouse underlying the Fantacalcio project.
+Normalized SQLite research warehouse underlying the FantaPredictor project.
 
 ## What this is
 
@@ -12,9 +12,15 @@ provider files without any live network dependency at runtime.
 
 ## Status
 
-Initial schema (`schema.sql`) and bootstrap helpers (`database.py`) are in
-place and unit-tested. The provider ingestors under `ingestors/` and the CLI
-builder script are the next increment and do **not** exist yet.
+The schema (`schema.sql`), bootstrap helpers (`database.py`), offline provider
+ingestors, and the CLI builder are implemented and unit-tested. The build is
+deliberately offline: download source snapshots first, then load them without
+network access.
+
+```bash
+python scripts/download_match_results.py --start-year 1993 --end-year 2025
+python scripts/build_database.py --db data/fantapredictor.db --season 2627
+```
 
 ## Schema
 
@@ -26,23 +32,22 @@ truth) and covers:
 - **Roster** — `roster_memberships` (confirmed roster for the active season)
 - **Results** — `matches`, `match_team_stats`, `match_odds`,
   `match_coaches`, `coach_club_seasons`, `coach_season_stats`
-- **Performance** — `player_season_stats` (provider + source tagged)
+- **Performance** — `player_season_stats`, `player_match_ratings`, `player_prices` (provider + source tagged)
 
 To inspect or load the schema interactively:
 
 ```python
 from src.db import database as db
 
-conn = db.get_connection("data/serie_a.db")
+conn = db.get_connection("data/fantapredictor.db")
 db.init_schema(conn)
 ```
 
 ## Manual data sources
 
 Some providers block programmatic access. Their data must be exported by hand
-from a browser under `data/season_<season>/manual/` (gitignored). No ingestor
-for these exists yet; the workflow below is the agreed approach once ingestion
-is implemented.
+from a browser under `data/season_<season>/manual/` (gitignored). A dedicated
+FBref manual-import adapter remains separate from automated provider loaders.
 
 | Source | File to place | Imported into | Notes |
 |---|---|---|---|
@@ -57,8 +62,13 @@ src/db/
 ├── __init__.py         # __version__ (single version)
 ├── schema.sql          # DDL - the whole relational model
 ├── database.py         # connection handling, schema bootstrap, source seeding
-└── ingestors/          # one module per provider; each exposes load(conn, path)
-    └── README.md
+└── ingestors/          # offline provider loaders
+    ├── common.py
+    ├── football_data.py
+    ├── rosters.py
+    ├── understat.py
+    ├── votes.py
+    └── coaches.py
 ```
 
 ## Releasing a new version

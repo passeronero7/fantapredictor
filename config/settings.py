@@ -330,14 +330,15 @@ class Config:
         return cls.get_season_dir(season) / 'fantacalcio' / cls.VOTES_DIR / filename
     
     @classmethod
-    def ensure_directories(cls):
+    def ensure_directories(cls, season: str = None):
         """Create all necessary directories if they don't exist."""
+        season_dir = cls.get_season_dir(season)
         directories = [
-            cls.FBREF_DATA_DIR,
-            cls.FANTACALCIO_DIR,
-            cls.MID_OUTPUTS_DIR,
-            cls.OUTPUTS_DIR,
-            cls.FANTACALCIO_DIR / cls.VOTES_DIR,
+            season_dir / "fbref_data",
+            season_dir / "fantacalcio",
+            season_dir / "mid_outputs",
+            season_dir / "outputs",
+            season_dir / "fantacalcio" / cls.VOTES_DIR,
         ]
         
         for directory in directories:

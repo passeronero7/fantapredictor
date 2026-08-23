@@ -1,0 +1,2 @@
+season,club,coach,started_at,ended_at,matches,wins,draws,losses,goals_for,goals_against,final_rank,source_url,notes
+2024/25,Example FC,Example Coach,2024-07-01,2025-06-30,38,20,10,8,60,40,4,https://example.test,Replace with manually verified records before import

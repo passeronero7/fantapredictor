@@ -43,7 +43,7 @@ To protect intellectual property, prevent Terms of Service violations, and enabl
 │  ├── data/                                              │
 │  │   ├── raw/ (Understat, Football-Data.co.uk dumps)    │
 │  │   ├── fantacalcio/voti/ (Official weekly votes)      │
-│  │   └── serie_a.db (Pre-compiled SQLite warehouse)     │
+│  │   └── fantapredictor.db (Local SQLite warehouse)      │
 │  ├── notebooks/ (Private auction strategy & exploratory)│
 │  └── config/private_league_rules.json                   │
 └─────────────────────────────────────────────────────────┘

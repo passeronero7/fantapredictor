@@ -44,7 +44,7 @@ class FantacalcioPipeline:
         self.include_history = include_history
         
         # Ensure directories exist
-        config.ensure_directories()
+        config.ensure_directories(self.season)
         
         logger.info(f"Initialized pipeline for season {self.season}")
     
@@ -87,7 +87,7 @@ class FantacalcioPipeline:
         logger.info("=" * 60)
         
         # NOTE: This stage requires manual vote downloads
-        votes_dir = config.FANTACALCIO_DIR / config.VOTES_DIR
+        votes_dir = config.get_season_dir(self.season) / "fantacalcio" / config.VOTES_DIR
         
         if not votes_dir.exists():
             logger.warning(f"Votes directory not found: {votes_dir}")
@@ -99,10 +99,10 @@ class FantacalcioPipeline:
         try:
             from src.data_processing.votes_processor import VotesProcessor
             
-            processor = VotesProcessor()
+            processor = VotesProcessor(season=self.season)
             votes_df = processor.process_all_matchdays(max_matchday=max_matchday)
             
-            output_file = config.get_mid_output_path(config.PLAYERS_VOTES_FILE)
+            output_file = config.get_mid_output_path(config.PLAYERS_VOTES_FILE, season=self.season)
             votes_df.to_excel(output_file)
             
             logger.info(f"✓ Processed votes for {len(votes_df)} player-match entries")
@@ -119,11 +119,14 @@ class FantacalcioPipeline:
         
         try:
             from src.data_processing.players_processor import PlayersProcessor
+            from src.data_processing.votes_processor import VotesProcessor
+
+            processor = PlayersProcessor(season=self.season)
+            vote_processor = VotesProcessor(season=self.season)
+            votes_df = vote_processor.process_all_matchdays()
+            players_df = processor.merge_all_sources(votes_df=votes_df)
             
-            processor = PlayersProcessor()
-            players_df = processor.merge_all_sources()
-            
-            output_file = config.get_mid_output_path(config.PLAYERS_STATS_FILE)
+            output_file = config.get_mid_output_path(config.PLAYERS_STATS_FILE, season=self.season)
             players_df.to_excel(output_file)
             
             logger.info(f"✓ Merged data for {len(players_df)} players")
@@ -141,16 +144,16 @@ class FantacalcioPipeline:
         try:
             from src.data_processing.match_data_builder import MatchDataBuilder
             
-            builder = MatchDataBuilder()
+            builder = MatchDataBuilder(season=self.season)
             datasets = builder.build_complete_dataset(
                 include_historical=self.include_history
             )
             
             # Save datasets
-            output_file = config.get_mid_output_path(config.DATABASE_ENTRIES_FILE)
+            output_file = config.get_mid_output_path(config.DATABASE_ENTRIES_FILE, season=self.season)
             datasets['outfield'].to_excel(output_file)
             
-            output_file_gk = config.get_mid_output_path(config.DATABASE_ENTRIES_GK_FILE)
+            output_file_gk = config.get_mid_output_path(config.DATABASE_ENTRIES_GK_FILE, season=self.season)
             datasets['goalkeepers'].to_excel(output_file_gk)
             
             logger.info(f"✓ Created {len(datasets['outfield'])} outfield training samples")
@@ -174,15 +177,15 @@ class FantacalcioPipeline:
             from src.models.neural_network import FantacalcioPredictor
             
             # Load training data
-            outfield_file = config.get_mid_output_path(config.DATABASE_ENTRIES_FILE)
-            gk_file = config.get_mid_output_path(config.DATABASE_ENTRIES_GK_FILE)
+            outfield_file = config.get_mid_output_path(config.DATABASE_ENTRIES_FILE, season=self.season)
+            gk_file = config.get_mid_output_path(config.DATABASE_ENTRIES_GK_FILE, season=self.season)
             
             import pandas as pd
             outfield_data = pd.read_excel(outfield_file, index_col=0)
             gk_data = pd.read_excel(gk_file, index_col=0)
             
             # Train model
-            predictor = FantacalcioPredictor()
+            predictor = FantacalcioPredictor(season=self.season)
             history = predictor.train(
                 outfield_data, 
                 gk_data,
@@ -211,16 +214,39 @@ class FantacalcioPipeline:
         
         try:
             from src.models.neural_network import FantacalcioPredictor
+            from src.data_processing.players_processor import PlayersProcessor
+            from src.data_processing.votes_processor import VotesProcessor
             
             # Load latest model
-            predictor = FantacalcioPredictor()
+            predictor = FantacalcioPredictor(season=self.season)
             predictor.load_latest_model()
-            
+
+            # Build prediction features only from information available before
+            # the requested matchday; do not use the target round itself.
+            vote_processor = VotesProcessor(season=self.season)
+            prior_votes = vote_processor.process_all_matchdays(
+                max_matchday=max(matchday - 1, 0)
+            )
+            players_data = PlayersProcessor(season=self.season).merge_all_sources(
+                votes_df=prior_votes
+            )
+            prices_path = config.get_season_dir(self.season) / "fantacalcio" / "prices.csv"
+            if prices_path.exists() and not players_data.empty:
+                import pandas as pd
+                prices = pd.read_csv(prices_path)
+                players_data = players_data.merge(
+                    prices[["player_normalized", "price_current", "fvm"]],
+                    on="player_normalized",
+                    how="left",
+                ).rename(columns={"price_current": "price"})
+
             # Generate predictions
-            predictions = predictor.predict_matchday(matchday=matchday)
+            predictions = predictor.predict_matchday(
+                matchday=matchday, players_data=players_data
+            )
             
             # Save predictions
-            output_file = config.OUTPUTS_DIR / f'pred_matchday_{matchday}.xlsx'
+            output_file = config.get_season_dir(self.season) / "outputs" / f"pred_matchday_{matchday}.xlsx"
             predictions.to_excel(output_file)
             
             logger.info(f"✓ Generated predictions for {len(predictions)} players")

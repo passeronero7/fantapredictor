@@ -16,6 +16,8 @@ Build a reproducible, evidence-led Fantacalcio research and prediction project f
 - Do not add runtime dependencies unless required; SQLite plus the standard library are preferred. If an ingestor needs a third-party package (e.g. `pandas`, `requests`), import it lazily inside the ingestor and document it.
 - FBref is never scraped. Import FBref data only from browser-exported CSV files placed under `data/season_*_27/manual/`. Never add logic that defeats a 403 or other access control.
 - Probabilistic modeling utilizes the Sinh-Arcsinh (SHASH) distribution to capture skewed, heavy-tailed fantasy scores, providing floor (q10), median (q50), and ceiling upside (q90) predictions alongside Monte Carlo matchday simulations.
+- Training must use observed vote/fantavoto targets only; never use the bootstrap roster as synthetic training data. Historical expanding features must not include the target matchday.
+- The lineup optimizer uses a 500-credit default budget, requires current player prices, and evaluates complete legal formations with correlated Monte Carlo draws and defence modifiers.
 - Security & IP protection: Maintain a Dual-Repository architecture (Public Core repo for algorithms and models, Private Workspace for raw data and personal league configs). Pre-commit hooks (`.githooks/pre-commit`) are enforced to block accidental commits of databases, spreadsheets, or credentials.
 - For every material change, update `CHANGELOG.md` and the relevant user-facing documentation, then stage and commit the coherent change set. Generated data and local environments remain untracked.
 
@@ -23,11 +25,15 @@ Build a reproducible, evidence-led Fantacalcio research and prediction project f
 
 ```bash
 python -m unittest discover -s tests -v
+python scripts/download_match_results.py --start-year 1993 --end-year 2025
+python scripts/download_current_prices.py --season 2026-27
+python scripts/build_database.py --db data/fantapredictor.db --season 2627
 python scripts/download_historical_votes.py --season 2024-25 --start 1 --end 38
 python scripts/run_pipeline.py --stage players --season 2627
 python scripts/run_pipeline.py --stage training-data --season 2627
 python scripts/run_pipeline.py --stage train --season 2627
 python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
+python scripts/analyze_defenders.py
 ```
 
 ## Data contract

@@ -1,8 +1,6 @@
 import tempfile
 import unittest
 from pathlib import Path
-import pandas as pd
-
 from src.data_processing.votes_processor import VotesProcessor
 
 
@@ -67,6 +65,38 @@ class VotesProcessorTests(unittest.TestCase):
         self.assertEqual(row["vote"], 7.5)
         self.assertEqual(row["fantavoto"], 10.5)
         self.assertEqual(row["goals"], 1.0)
+
+    def test_html_parser_preserves_all_three_vote_variants(self):
+        sample_html = """
+        <table><tr><th>Roma</th></tr><tr>
+          <td><span class="role" data-value="d"></span><a class="player-name">Defender</a></td>
+          <td><span class="player-grade" data-value="6"></span>
+              <span class="player-fanta-grade" data-value="6"></span>
+              <span class="player-grade" data-value="6,5"></span>
+              <span class="player-fanta-grade" data-value="6,5"></span>
+              <span class="player-grade" data-value="7"></span>
+              <span class="player-fanta-grade" data-value="7"></span></td>
+        </tr></table>
+        """
+        frame = VotesProcessor.parse_matchday_html(sample_html)
+        row = frame.iloc[0]
+        self.assertEqual(row["vote_fantacalcio"], 6.0)
+        self.assertEqual(row["vote_statistical"], 6.5)
+        self.assertEqual(row["vote_italy"], 7.0)
+
+    def test_process_all_matchdays_ignores_aggregate_file_and_deduplicates(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            daily = directory / "Voti_Giornata_01.csv"
+            daily.write_text(
+                "Nome,Squadra,Voto,Fantavoto\nPlayer,Roma,6,6\n",
+                encoding="utf-8",
+            )
+            (directory / "Voti_Full.csv").write_text(daily.read_text(encoding="utf-8"), encoding="utf-8")
+            processor = VotesProcessor(season="2425")
+            processor.votes_dir = directory
+            frame = processor.process_all_matchdays()
+            self.assertEqual(len(frame), 1)
 
 
 if __name__ == "__main__":

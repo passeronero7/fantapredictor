@@ -53,6 +53,13 @@ DEFAULT_SOURCES = [
         "notes": "Provisional 2026/27 club/player rosters.",
     },
     {
+        "slug": "fantacalcio",
+        "name": "Fantacalcio.it official ratings",
+        "homepage_url": "https://www.fantacalcio.it/voti-fantacalcio-serie-a",
+        "licence": "See provider terms. Keep source files private unless permitted.",
+        "notes": "Official matchday votes, fantavoti and bonus/malus events.",
+    },
+    {
         "slug": "fbref",
         "name": "FBref",
         "homepage_url": "https://fbref.com",

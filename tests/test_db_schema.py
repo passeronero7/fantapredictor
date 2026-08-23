@@ -65,7 +65,7 @@ class SchemaTests(unittest.TestCase):
         # Calling init_schema twice must not duplicate sources
         db.init_schema(self.conn)
         count = self.conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
-        self.assertEqual(count, 6)
+        self.assertEqual(count, 7)
 
 
 if __name__ == "__main__":

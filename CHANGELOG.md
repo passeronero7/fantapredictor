@@ -15,10 +15,14 @@ All notable project changes are recorded here.
 - Monte Carlo lineup optimizer (`src/models/lineup_optimizer.py` / `LineupOptimizer`) with formation validation and Italian Serie A *Modificatore Difesa* calculations.
 - Historical Fantacalcio.it vote downloader (`scripts/download_historical_votes.py`) enabling automated retrieval and archiving of official matchday votes, fantavoti, and bonuses/maluses across 11 historical Serie A seasons (2015/16 to present).
 - Multi-source vote parsing engine in `VotesProcessor` supporting both official matchday HTML tables and local spreadsheet files with automatic Italian decimal/grade normalization (e.g. scaling political 55/60 codes).
+- Normalized SQLite ingestors for Understat, rosters, official ratings, Football-Data match results/odds, quotations, and curated coach history, plus `scripts/build_database.py`.
+- Public Fantacalcio quotation parser and downloader (`scripts/download_current_prices.py`) providing current classic/mantra roles, prices, and FVM values.
+- Full local source snapshot generated for analysis: 11 historical rating seasons, 33 match-result seasons, 124,122 player-match ratings, 11,726 matches, 46,866 odds rows, 539 current quotations, and 6,726 Understat player-season rows.
+- Full local source snapshot generated for analysis: 11 historical rating seasons, 33 match-result seasons, 124,122 player-match ratings, 11,726 matches, 46,866 odds rows, and 6,726 Understat player-season rows.
 - Dual-Repository security architecture and setup guide in `docs/repository_architecture_and_security.md` (Public Core for algorithms, Private Workspace for proprietary data).
 - Automated pre-commit leak-prevention hook (`.githooks/pre-commit`) blocking accidental commits of database files (`.db`, `.sqlite`), spreadsheets (`.xlsx`, `.xls`, `.parquet`), and secret tokens.
 - Hardened `.gitignore` excluding all credentials, database artifacts, private spreadsheets, and runtime logs.
-- Comprehensive unit tests covering distributions, vote parsing, player merging, neural predictor, and lineup optimization (26 passing tests).
+- Comprehensive unit tests covering distributions, vote parsing, player merging, quotations, database ingestors, deep predictor, and lineup optimization (35 passing tests).
 
 ### Changed
 
@@ -31,6 +35,10 @@ All notable project changes are recorded here.
 - Fixed broken exception block in `src/scrapers/fbref_scraper.py` causing syntax/runtime issues with undefined variable `e`.
 - Fixed unused `import os` in `config/settings.py` and cleaned up pipeline script references.
 - Fixed per-90 rate metric explosion for low-sample players by introducing Bayesian prior shrinkage in `PlayersProcessor`.
+- Removed synthetic training fallback and prevented same-matchday vote target leakage in `MatchDataBuilder`.
+- Replaced the gradient-boosting placeholder with a TensorFlow deep SHASH model and persisted Keras/scaler artifacts.
+- Enforced the 500-credit lineup budget and added correlated Monte Carlo formation search with defence modifiers.
+- Fixed season propagation and season-specific output directories in `scripts/run_pipeline.py`.
 
 
 ## [0.1.0] - 2026-08-23

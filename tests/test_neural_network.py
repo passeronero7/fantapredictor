@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 import pandas as pd
 
 from src.models.neural_network import FantacalcioPredictor
@@ -16,6 +18,8 @@ class NeuralNetworkPredictorTests(unittest.TestCase):
             {"hist_minutes": 2700, "hist_xg": 0.0, "hist_xa": 0.0, "hist_xg_per90": 0.0, "hist_xa_per90": 0.0, "target_vote": 6.3, "target_fantavoto": 5.3},
             {"hist_minutes": 1800, "hist_xg": 0.0, "hist_xa": 0.0, "hist_xg_per90": 0.0, "hist_xa_per90": 0.0, "target_vote": 5.9, "target_fantavoto": 4.4},
         ])
+        outfield_df = pd.concat([outfield_df, outfield_df], ignore_index=True)
+        gk_df = pd.concat([gk_df, gk_df, gk_df, gk_df], ignore_index=True)
 
         predictor = FantacalcioPredictor(season="2627")
         train_res = predictor.train(outfield_df, gk_df, epochs=20)
@@ -35,6 +39,43 @@ class NeuralNetworkPredictorTests(unittest.TestCase):
         # Attacker ceiling should be substantially higher than floor
         striker = preds[preds["role"] == "A"].iloc[0]
         self.assertGreater(striker["ceiling_q90"], striker["floor_q10"])
+
+    def test_save_and_load_restores_predictions(self):
+        rows = [
+            {
+                "hist_minutes": 900 + i * 100,
+                "hist_xg": i / 10,
+                "hist_xa": (8 - i) / 10,
+                "hist_xg_per90": i / 100,
+                "hist_xa_per90": (8 - i) / 100,
+                "target_vote": 6.0 + i / 10,
+                "target_fantavoto": 6.5 + i / 10,
+            }
+            for i in range(8)
+        ]
+        training = pd.DataFrame(rows)
+        players = pd.DataFrame([
+            {"player": "Player A", "role": "A", **rows[2]},
+            {"player": "Player B", "role": "D", **rows[4]},
+        ])
+
+        with tempfile.TemporaryDirectory() as temporary:
+            model_dir = Path(temporary)
+            predictor = FantacalcioPredictor(season="unit-persistence")
+            predictor.models_dir = model_dir
+            predictor.train(training, training, epochs=1)
+            predictor.save_model("unit")
+            expected = predictor.predict_matchday(1, players)
+
+            restored = FantacalcioPredictor(season="unit-persistence")
+            restored.models_dir = model_dir
+            restored.load_latest_model()
+            actual = restored.predict_matchday(1, players)
+
+            self.assertEqual(restored.version, "unit")
+            self.assertTrue(
+                (expected["median_q50"].to_numpy() == actual["median_q50"].to_numpy()).all()
+            )
 
 
 if __name__ == "__main__":

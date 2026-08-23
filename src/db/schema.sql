@@ -209,6 +209,58 @@ CREATE TABLE IF NOT EXISTS match_odds (
     PRIMARY KEY (match_id, provider)
 );
 
+-- Official fantasy ratings and bonus/malus events per player and matchday.
+-- `vote` and `fantavoto` are the editorial Fantacalcio values; the three
+-- source-specific columns preserve the statistical and Voto Italia variants.
+CREATE TABLE IF NOT EXISTS player_match_ratings (
+    id                    INTEGER PRIMARY KEY,
+    season_id             INTEGER NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
+    matchday              INTEGER NOT NULL,
+    player_id             INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    club_id               INTEGER REFERENCES clubs(id),
+    vote                  REAL,
+    fantavoto             REAL,
+    vote_statistical      REAL,
+    fantavoto_statistical REAL,
+    vote_italy            REAL,
+    fantavoto_italy       REAL,
+    goals                INTEGER DEFAULT 0,
+    goals_conceded       INTEGER DEFAULT 0,
+    assists              INTEGER DEFAULT 0,
+    yellow_cards         INTEGER DEFAULT 0,
+    red_cards            INTEGER DEFAULT 0,
+    penalties_saved      INTEGER DEFAULT 0,
+    penalties_missed     INTEGER DEFAULT 0,
+    penalties_scored     INTEGER DEFAULT 0,
+    own_goals            INTEGER DEFAULT 0,
+    source_id             INTEGER NOT NULL REFERENCES sources(id),
+    source_ref            TEXT,
+    source_file           TEXT,
+    updated_at            TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (season_id, matchday, player_id, club_id, source_id)
+);
+CREATE INDEX IF NOT EXISTS ix_player_match_ratings_player
+    ON player_match_ratings (player_id, season_id, matchday);
+
+-- Fantasy-provider quotation snapshot used by the auction optimizer.
+CREATE TABLE IF NOT EXISTS player_prices (
+    id               INTEGER PRIMARY KEY,
+    season_id        INTEGER NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
+    player_id        INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    club_id          INTEGER REFERENCES clubs(id),
+    role_classic     TEXT,
+    role_mantra      TEXT,
+    price_initial    REAL,
+    price_current   REAL,
+    fvm              REAL,
+    source_id        INTEGER NOT NULL REFERENCES sources(id),
+    source_ref       TEXT,
+    updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (season_id, player_id, source_id)
+);
+CREATE INDEX IF NOT EXISTS ix_player_prices_season_role
+    ON player_prices (season_id, role_classic, price_current);
+
 -- -----------------------------------------------------------------------------
 -- Player performance
 -- -----------------------------------------------------------------------------

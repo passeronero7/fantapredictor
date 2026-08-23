@@ -72,6 +72,15 @@ class VotesProcessor:
         except ValueError:
             return default
 
+    @staticmethod
+    def _matchday_from_filename(filepath: Path) -> Optional[int]:
+        """Extract a matchday without treating aggregate archive files as rounds."""
+        stem = filepath.stem.lower()
+        if "full" in stem:
+            return None
+        match = re.search(r"(?:giornata|matchday|md)[_\s-]*(\d{1,2})", stem)
+        return int(match.group(1)) if match else None
+
     def parse_vote_file(self, filepath: Path, matchday: Optional[int] = None) -> pd.DataFrame:
         """Parse a single Fantacalcio vote file into a cleaned DataFrame."""
         filepath = Path(filepath)
@@ -159,16 +168,19 @@ class VotesProcessor:
             logger.warning(f"Votes directory does not exist: {self.votes_dir}")
             return pd.DataFrame()
 
-        vote_files = sorted(list(self.votes_dir.glob("*.xlsx")) + list(self.votes_dir.glob("*.csv")))
+        vote_files = sorted(
+            file for pattern in ("*.xlsx", "*.xls", "*.csv")
+            for file in self.votes_dir.glob(pattern)
+            if self._matchday_from_filename(file) is not None
+        )
         if not vote_files:
             logger.warning(f"No vote files found in {self.votes_dir}")
             return pd.DataFrame()
 
         frames = []
         for file in vote_files:
-            match = re.search(r"(?:giornata|g|_|md)[_\s-]*(\d+)", file.stem, re.IGNORECASE)
-            md = int(match.group(1)) if match else None
-            if max_matchday is not None and md is not None and md > max_matchday:
+            md = self._matchday_from_filename(file)
+            if max_matchday is not None and md > max_matchday:
                 continue
 
             try:
@@ -183,7 +195,11 @@ class VotesProcessor:
             return pd.DataFrame()
 
         combined = pd.concat(frames, ignore_index=True)
-        return combined
+        natural_key = ["season", "matchday", "player_normalized", "team"]
+        available_key = [column for column in natural_key if column in combined.columns]
+        if available_key:
+            combined = combined.drop_duplicates(available_key, keep="first")
+        return combined.reset_index(drop=True)
 
     @classmethod
     def parse_matchday_html(cls, html_content: str, season: str = "2024-25", matchday: int = 1) -> pd.DataFrame:
@@ -202,17 +218,31 @@ class VotesProcessor:
                 if not player_elem:
                     continue
                 player_name = player_elem.get_text(strip=True)
+                player_href = player_elem.get("href", "")
+                player_id = re.search(r"/(\d+)/(?:\d{4}-\d{2})/?$", player_href)
                 role_elem = row.find("span", class_="role")
                 role = role_elem.get("data-value", "").upper() if role_elem else "C"
 
                 grades = row.find_all("span", class_="player-grade")
                 fanta_grades = row.find_all("span", class_="player-fanta-grade")
 
-                vote_raw = grades[0].get("data-value", "") if grades else ""
-                fv_raw = fanta_grades[0].get("data-value", "") if fanta_grades else ""
+                # The public page exposes three pairs in this order:
+                # editorial Fantacalcio, statistical, and Voto Italia.
+                vote_values = [
+                    cls._clean_grade(span.get("data-value", ""), default=6.0)
+                    for span in grades[:3]
+                ]
+                fanta_values = [
+                    cls._clean_grade(span.get("data-value", ""), default=6.0)
+                    for span in fanta_grades[:3]
+                ]
+                while len(vote_values) < 3:
+                    vote_values.append(6.0)
+                while len(fanta_values) < 3:
+                    fanta_values.append(vote_values[len(fanta_values)])
 
-                vote = cls._clean_grade(vote_raw, default=6.0)
-                fantavoto = cls._clean_grade(fv_raw, default=vote)
+                vote = vote_values[0]
+                fantavoto = fanta_values[0]
 
                 bonuses: dict[str, float] = {}
                 for b in row.find_all("span", class_="player-bonus"):
@@ -228,10 +258,17 @@ class VotesProcessor:
                     "matchday": matchday,
                     "team": team_name,
                     "player": player_name,
+                    "id": player_id.group(1) if player_id else None,
                     "player_normalized": normalize_name(player_name),
                     "role": role,
                     "vote": vote,
                     "fantavoto": fantavoto,
+                    "vote_fantacalcio": vote_values[0],
+                    "fantavoto_fantacalcio": fanta_values[0],
+                    "vote_statistical": vote_values[1],
+                    "fantavoto_statistical": fanta_values[1],
+                    "vote_italy": vote_values[2],
+                    "fantavoto_italy": fanta_values[2],
                     "goals": bonuses.get("Gol segnati", 0.0),
                     "goals_conceded": bonuses.get("Gol subiti", 0.0),
                     "assists": bonuses.get("Assist", 0.0),

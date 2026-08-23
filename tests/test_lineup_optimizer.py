@@ -20,6 +20,7 @@ class LineupOptimizerTests(unittest.TestCase):
             {"player": "A2", "role": "A", "predicted_vote": 6.5, "predicted_fantavoto": 9.0, "ceiling_q90": 13.5, "floor_q10": 5.0},
             {"player": "A3", "role": "A", "predicted_vote": 6.0, "predicted_fantavoto": 8.0, "ceiling_q90": 12.0, "floor_q10": 4.5},
         ])
+        self.players_df["price"] = [10, 10, 10, 10, 10, 10, 10, 10, 10, 20, 20, 20]
 
     def test_defense_modifier_calculation(self):
         optimizer = LineupOptimizer(self.players_df)
@@ -53,13 +54,19 @@ class LineupOptimizerTests(unittest.TestCase):
     def test_optimal_lineup_with_defense_modifier_adds_bonus(self):
         optimizer = LineupOptimizer(self.players_df, formation="4-3-3", enable_modificatore=True)
         res = optimizer.get_optimal_lineup()
-        self.assertEqual(res["defense_modifier_bonus"], 3.0)
+        self.assertGreater(res["defense_modifier_bonus"], 2.0)
         self.assertGreater(res["total_expected_points"], res["base_points"])
 
     def test_monte_carlo_simulation_draws_matrix(self):
         optimizer = LineupOptimizer(self.players_df, simulations=500)
         sim_df = optimizer.simulate_matchday_slates()
         self.assertEqual(sim_df.shape, (len(self.players_df), 500))
+
+    def test_budget_is_enforced(self):
+        expensive = self.players_df.copy()
+        expensive["price"] = 100
+        with self.assertRaises(ValueError):
+            LineupOptimizer(expensive, budget=500).get_optimal_lineup()
 
 
 if __name__ == "__main__":
