@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Security & IP Leak Prevention Pre-Commit Hook
+# ------------------------------------------------------------------------------
+# Blocks accidental staging of:
+#   1. Proprietary database files (*.db, *.sqlite, *.sqlite3, *.db-wal, *.db-shm)
+#   2. Raw data spreadsheets (*.xlsx, *.xls, *.parquet, and data/ CSVs)
+#   3. API keys, secrets, tokens, or .env files
+# ==============================================================================
+
+set -eo pipefail
+
+echo "🔍 Running pre-commit security & leak-prevention checks..."
+
+# 1. Check for database files staged for commit
+STAGED_DB_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(db|sqlite|sqlite3|db-wal|db-shm)$' || true)
+if [ -n "$STAGED_DB_FILES" ]; then
+    echo "❌ ERROR: Attempting to commit database files:"
+    echo "$STAGED_DB_FILES"
+    echo "💡 Database files must stay local and untracked."
+    exit 1
+fi
+
+# 2. Check for raw data spreadsheets or data directory dumps
+STAGED_DATA_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '(\.xlsx|\.xls|\.parquet|/data/.+\.csv)$' || true)
+if [ -n "$STAGED_DATA_FILES" ]; then
+    echo "❌ ERROR: Attempting to commit raw data / spreadsheet files:"
+    echo "$STAGED_DATA_FILES"
+    echo "💡 Raw data files must remain untracked in .gitignore."
+    exit 1
+fi
+
+# 3. Check for environment / credentials files
+STAGED_SECRET_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '(\.env|\.pem|\.key|\.cert|credentials\.json)$' || true)
+if [ -n "$STAGED_SECRET_FILES" ]; then
+    echo "❌ ERROR: Attempting to commit secret/credentials files:"
+    echo "$STAGED_SECRET_FILES"
+    exit 1
+fi
+
+# 4. Scan staged diffs for common API token signatures
+STAGED_SECRETS=$(git diff --cached | grep -Ei '(ghp_[0-9a-zA-Z]{36}|gho_[0-9a-zA-Z]{36}|sk-[0-9a-zA-Z]{32,}|AKIA[0-9A-Z]{16})' || true)
+if [ -n "$STAGED_SECRETS" ]; then
+    echo "❌ ERROR: Detected potential API key or token in staged changes!"
+    exit 1
+fi
+
+echo "✅ Security check passed: No proprietary data or credentials detected."
+exit 0

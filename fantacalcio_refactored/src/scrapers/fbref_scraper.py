@@ -72,9 +72,6 @@ class FBRefScraper:
 
             return player_table, team_table
 
-        #except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP error fetching {url}: {e}")
-            raise
         except Exception as e:
             logger.error(f"Error fetching tables from {url}: {e}")
             raise

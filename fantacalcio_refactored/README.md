@@ -1,6 +1,6 @@
-# Fantacalcio - Bayesian Estimated Team's Outcome
+# FantaPredictor - Bayesian & Probabilistic Fantacalcio System
 
-Machine learning model for predicting Serie A players' performance in Fantacalcio (Italian fantasy football).
+Probabilistic machine learning model and Monte Carlo lineup optimizer for predicting Serie A players' performance in Fantacalcio (Italian fantasy football).
 
 **Refactored codebase** - modular, maintainable, and production-ready.
 

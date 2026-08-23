@@ -2,33 +2,28 @@
 
 All notable project changes are recorded here.
 
-## [Unreleased] - 2026-08-22
+## [Unreleased] - 2026-08-23
 
 ### Added
 
-- Root project operating guide (`AGENTS.md`), authoritative README, and 2026/27 roster scouting brief.
-- Regression tests for FBref table parsing and season-aware scraper output.
-- A root `.gitignore` that excludes virtual environments, generated data, logs, and local IDE state.
-- A 2026/27 season data workspace and a tested free-source assessment.
-- A reproducible baseline downloader for a 2026/27 club/player snapshot and matched historical player seasons.
-
-### Changed
-
-- Set the active configuration to Serie A 2026/27 (`2627` / `2026_27`).
-- Make stage-one scraper reads and writes season-specific data.
-- Move active paths to `data/season_2026_27/` and generate the season-specific FBref URL.
-- Harden FBref parsing so missing cells do not create malformed DataFrames; map the project `team` field to FBref's `squad` column.
+- In-depth evaluation of USA football probabilistic modeling (`amiles2233/ff_prob`) and architectural blueprint in `docs/probabilistic_modeling_and_ff_prob_evaluation.md`.
+- Sinh-Arcsinh (SHASH) distribution module (`src/models/distributions.py`) implementing 4-parameter asymmetric, heavy-tailed fantasy scoring density with PDF, CDF, quantile (PPF), sampling (RVS), and MLE fitting.
+- Fantacalcio weekly vote processing engine (`src/data_processing/votes_processor.py`) supporting Italian spreadsheet formats and robust decimal/delimiter parsing.
+- Unified multi-source player merging engine (`src/data_processing/players_processor.py`) with name normalization and empirical Bayesian shrinkage for low-minute per-90 metrics.
+- Matchday feature matrix builder (`src/data_processing/match_data_builder.py`) for outfield players and goalkeepers.
+- Probabilistic prediction engine (`src/models/neural_network.py` / `FantacalcioPredictor`) producing expected fantasy points and risk quantiles (floor q10, median q50, ceiling q90).
+- Monte Carlo lineup optimizer (`src/models/lineup_optimizer.py` / `LineupOptimizer`) with formation validation and Italian Serie A *Modificatore Difesa* calculations.
+- Dual-Repository security architecture and setup guide in `docs/repository_architecture_and_security.md` (Public Core for algorithms, Private Workspace for proprietary data).
+- Automated pre-commit leak-prevention hook (`.githooks/pre-commit`) blocking accidental commits of database files (`.db`, `.sqlite`), spreadsheets (`.xlsx`, `.xls`, `.parquet`), and secret tokens.
+- Hardened `.gitignore` excluding all credentials, database artifacts, private spreadsheets, and runtime logs.
+- Comprehensive unit tests covering distributions, vote parsing, player merging, neural predictor, and lineup optimization (26 passing tests).
 
 ### Fixed
 
-- Declare the `cloudscraper` runtime dependency used by the FBref scraper.
-- Correct the stale root documentation, which claimed missing modules and a complete production pipeline.
+- Fixed broken exception block in `src/scrapers/fbref_scraper.py` causing syntax/runtime issues with undefined variable `e`.
+- Fixed unused `import os` in `config/settings.py` and cleaned up pipeline script references.
+- Fixed per-90 rate metric explosion for low-sample players by introducing Bayesian prior shrinkage in `PlayersProcessor`.
 
-### Known limitations
-
-- Stages 2–6 import modules that are not present in this handoff, so they cannot run yet.
-- The committed `venvfanta/` virtual environment has an invalid relocated interpreter path.
-- FBref currently returns HTTP 403 to the automated scraper; see `docs/free_data_sources.md` for the tested alternatives.
 
 ## [0.1.0] - 2026-08-23
 

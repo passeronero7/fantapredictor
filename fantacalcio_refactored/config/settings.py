@@ -4,7 +4,6 @@ Central configuration for Fantacalcio project.
 All file paths, URLs, and model hyperparameters are defined here.
 """
 
-import os
 from pathlib import Path
 
 # Project root directory

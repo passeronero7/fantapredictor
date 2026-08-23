@@ -8,14 +8,40 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Generated pipeline data and runtime output
+# Secrets, credentials & environment configs
+.env
+.env.*
+*.key
+*.pem
+*.token
+*.cert
+credentials.json
+*secret*
+
+# Generated pipeline data, spreadsheets & runtime output
 fantacalcio_refactored/data/**
 !fantacalcio_refactored/data/season_2026_27/
 !fantacalcio_refactored/data/season_2026_27/.gitkeep
 !fantacalcio_refactored/data/season_2026_27/README.md
 fantacalcio_refactored/fantacalcio.log
 *.log
+*.xlsx
+*.xls
+*.parquet
+
+# Generated SQLite research warehouse & database files
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Manually exported third-party CSVs (never versioned)
+fantacalcio_refactored/data/**/manual/
+data/
 
 # Local editor state and archives
 .idea/
+.vscode/
 *.zip
+*.tar.gz
