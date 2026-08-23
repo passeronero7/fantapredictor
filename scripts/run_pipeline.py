@@ -211,6 +211,7 @@ class FantacalcioPipeline:
         try:
             from src.models.neural_network import FantacalcioPredictor
             from src.data_processing.players_processor import PlayersProcessor
+            from src.data_processing.prices_processor import merge_current_prices
             from src.data_processing.votes_processor import VotesProcessor
             
             # Load latest model
@@ -230,15 +231,23 @@ class FantacalcioPipeline:
             players_data = PlayersProcessor(season=self.season).merge_all_sources(
                 votes_df=prior_votes
             )
-            prices_path = config.get_season_dir(self.season) / "fantacalcio" / "prices.csv"
-            if prices_path.exists() and not players_data.empty:
-                import pandas as pd
-                prices = pd.read_csv(prices_path)
-                players_data = players_data.merge(
-                    prices[["player_normalized", "price_current", "fvm"]],
-                    on="player_normalized",
-                    how="left",
-                ).rename(columns={"price_current": "price"})
+            if config.DATA_DIR.joinpath("fantapredictor.db").exists():
+                from src.db import database, repository
+
+                conn = database.get_connection(config.DATA_DIR / "fantapredictor.db")
+                try:
+                    prices = repository.load_prices(conn, self.season)
+                finally:
+                    conn.close()
+            else:
+                prices_path = config.get_season_dir(self.season) / "fantacalcio" / "prices.csv"
+                if prices_path.exists():
+                    import pandas as pd
+                    prices = pd.read_csv(prices_path)
+                else:
+                    prices = None
+            if prices is not None and not players_data.empty:
+                players_data = merge_current_prices(players_data, prices)
 
             # Generate predictions
             predictions = predictor.predict_matchday(

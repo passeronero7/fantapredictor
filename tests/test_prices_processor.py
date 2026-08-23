@@ -1,6 +1,8 @@
 import unittest
 
-from src.data_processing.prices_processor import parse_prices_html
+import pandas as pd
+
+from src.data_processing.prices_processor import merge_current_prices, parse_prices_html
 
 
 class PricesProcessorTests(unittest.TestCase):
@@ -22,6 +24,26 @@ class PricesProcessorTests(unittest.TestCase):
         self.assertEqual(row["role_classic"], "D")
         self.assertEqual(row["price_current"], 12.0)
         self.assertEqual(row["fvm"], 80.0)
+
+    def test_merge_matches_abbreviated_quotation_names(self):
+        players = pd.DataFrame([{
+            "player": "Lautaro Martinez",
+            "player_normalized": "lautaro martinez",
+            "role": "F",
+        }])
+        prices = pd.DataFrame([{
+            "player": "Martinez L.",
+            "price_current": 35,
+            "fvm": 370,
+            "role_classic": "A",
+            "role_mantra": "pc",
+        }])
+
+        result = merge_current_prices(players, prices)
+
+        self.assertEqual(result.loc[0, "price"], 35)
+        self.assertEqual(result.loc[0, "role"], "A")
+        self.assertEqual(result.loc[0, "price_match"], "surname_initial")
 
 
 if __name__ == "__main__":
