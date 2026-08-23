@@ -25,8 +25,8 @@ class DatabaseIngestorTests(unittest.TestCase):
 
             roster = root / "roster.csv"
             roster.write_text(
-                "player,club_2026_27,status,source_url,checked_at\n"
-                "Test Defender,Test FC,confirmed,https://example.test,2026-08-23\n",
+                "player,club_2026_27,role,status,source_url,checked_at\n"
+                "Test Defender,Test FC,D,confirmed,https://example.test,2026-08-23\n",
                 encoding="utf-8",
             )
 
@@ -94,8 +94,8 @@ class DatabaseIngestorTests(unittest.TestCase):
             root = Path(temporary)
             roster = root / "roster.csv"
             roster.write_text(
-                "player,club_2026_27,status,source_url,checked_at\n"
-                "Test Player,Test FC,provisional,https://example.test,2026-08-23\n",
+                "player,club_2026_27,role,status,source_url,checked_at\n"
+                "Test Player,Test FC,D,provisional,https://example.test,2026-08-23\n",
                 encoding="utf-8",
             )
 

@@ -12,16 +12,22 @@ from src.db.ingestors.common import club_id, finish_run, player_id, season_label
 def load(conn, path: str | Path, season: str) -> int:
     """Load roster memberships from the existing CSV snapshot."""
     frame = pd.read_csv(path)
-    required_columns = {"player", "source_url", "checked_at", "status"}
+    required_columns = {"player", "role", "source_url", "checked_at", "status"}
     missing_columns = required_columns - set(frame.columns)
     if missing_columns:
         raise ValueError(
             f"Roster is missing required columns: {', '.join(sorted(missing_columns))}"
         )
+    if not {"club", "club_2026_27"}.intersection(frame.columns):
+        raise ValueError("Roster is missing required column: club")
     for column in ("source_url", "checked_at", "status"):
         values = frame[column].astype("string")
         if values.isna().any() or values.str.strip().eq("").any():
             raise ValueError(f"Every roster assertion must include {column}")
+    confirmed = frame["status"].astype(str).str.lower().eq("confirmed")
+    confirmed_roles = frame.loc[confirmed, "role"].astype("string")
+    if confirmed_roles.isna().any() or confirmed_roles.str.strip().eq("").any():
+        raise ValueError("Every confirmed roster assertion must include role")
     invalid_statuses = set(frame["status"].dropna().astype(str)) - {
         "confirmed", "watchlist", "excluded"
     }
@@ -38,7 +44,7 @@ def load(conn, path: str | Path, season: str) -> int:
             if not name or not club:
                 continue
             cid = club_id(conn, club, "virgilio")
-            pid = player_id(conn, name, "virgilio")
+            pid = player_id(conn, name, "virgilio", role=row.get("role") or None)
             status = row["status"]
             conn.execute(
                 """INSERT INTO roster_memberships

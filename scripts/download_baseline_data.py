@@ -54,8 +54,10 @@ def parse_rosters(html: str, checked_at: str) -> pd.DataFrame:
             if player:
                 records.append({
                     "club_2026_27": club,
+                    "club": club,
                     "player": player,
                     "player_normalized": normalize_name(player),
+                    "role": "",
                     "source_url": ROSTER_URL,
                     "checked_at": checked_at,
                     # A public roster listing is not proof of registration or a

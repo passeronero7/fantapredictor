@@ -45,6 +45,13 @@ python scripts/run_pipeline.py --stage lineup --matchday 1 --season 2627
 python scripts/evaluate_model.py --season 2425 --cutoff-matchday 20
 ```
 
+Before an auction or model run, validate the private snapshot:
+
+```bash
+FANTAPREDICTOR_DATA_DIR=/path/to/fantapredictor-workspace/data \
+  python scripts/validate_release.py --season 2627 --require-confirmed
+```
+
 When running the core from the private workspace, point it at the workspace
 data directory without changing the submodule:
 

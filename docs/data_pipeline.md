@@ -129,3 +129,9 @@ python scripts/optimize_lineup.py --season 2627 --matchday 1 \
 
 The output contains the selected starters, total cost, budget remaining, base
 points, defence modifier contribution, and simulation q10/q50/q90 results.
+
+Use `scripts/validate_release.py --require-confirmed` before an auction. It
+fails if roster provenance is missing, statuses are invalid, confirmed roles
+are absent, or no confirmed player exists. The private workspace can record a
+checksum manifest with `scripts/create_data_manifest.py`; generated models and
+prediction exports remain excluded from that source manifest.
