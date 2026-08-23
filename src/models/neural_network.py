@@ -86,8 +86,10 @@ class FantacalcioPredictor:
     def _log_shash_probability(tf, target, params):
         """TensorFlow log-density for the SHASH parameterization."""
         loc, raw_scale, skew, raw_tail = tf.unstack(params, axis=-1)
-        scale = tf.nn.softplus(raw_scale) + 1e-3
-        tail = tf.nn.softplus(raw_tail) + 1e-3
+        loc = tf.clip_by_value(loc, 0.0, 20.0)
+        skew = tf.clip_by_value(skew, -0.5, 0.5)
+        scale = tf.nn.softplus(tf.clip_by_value(raw_scale, -5.0, 5.0)) + 0.1
+        tail = tf.nn.softplus(tf.clip_by_value(raw_tail, -5.0, 5.0)) + 0.75
         z = (target - loc) / scale
         transformed = tf.sinh(tail * tf.asinh(z) - skew)
         radius = tail * tf.asinh(z) - skew
@@ -108,7 +110,10 @@ class FantacalcioPredictor:
         tf = cls._tf()
         vote_log_prob = cls._log_shash_probability(tf, y_true[:, 0], y_pred[:, :4])
         fantasy_log_prob = cls._log_shash_probability(tf, y_true[:, 1], y_pred[:, 4:])
-        return tf.reduce_mean(-(vote_log_prob + fantasy_log_prob))
+        vote_loc = tf.clip_by_value(y_pred[:, 0], 0.0, 20.0)
+        fantasy_loc = tf.clip_by_value(y_pred[:, 4], 0.0, 20.0)
+        point_loss = tf.square(y_true[:, 0] - vote_loc) + tf.square(y_true[:, 1] - fantasy_loc)
+        return tf.reduce_mean(-(vote_log_prob + fantasy_log_prob) + 0.1 * point_loss)
 
     @staticmethod
     def _targets(data: pd.DataFrame) -> np.ndarray:
@@ -180,12 +185,18 @@ class FantacalcioPredictor:
     def _decode_params(raw: np.ndarray) -> np.ndarray:
         """Convert unconstrained network outputs to valid distribution parameters."""
         params = raw.astype(float, copy=True)
+        for location_column in (0, 4):
+            params[:, location_column] = np.clip(params[:, location_column], 0.0, 20.0)
         for scale_column in (1, 5):
-            params[:, scale_column] = np.logaddexp(0.0, params[:, scale_column]) + 1e-3
+            params[:, scale_column] = np.logaddexp(
+                0.0, np.clip(params[:, scale_column], -5.0, 5.0)
+            ) + 0.1
         for tail_column in (3, 7):
-            params[:, tail_column] = np.logaddexp(0.0, params[:, tail_column]) + 1e-3
-        params[:, 2] = np.clip(params[:, 2], -5.0, 5.0)
-        params[:, 6] = np.clip(params[:, 6], -5.0, 5.0)
+            params[:, tail_column] = np.logaddexp(
+                0.0, np.clip(params[:, tail_column], -5.0, 5.0)
+            ) + 0.75
+        params[:, 2] = np.clip(params[:, 2], -0.5, 0.5)
+        params[:, 6] = np.clip(params[:, 6], -0.5, 0.5)
         return params
 
     def _predict_params(self, data: pd.DataFrame, goalkeeper: bool) -> np.ndarray:
@@ -218,8 +229,18 @@ class FantacalcioPredictor:
             raw_vote[is_gk] = params[:, :4]
             raw_fantasy[is_gk] = params[:, 4:]
 
-        output["predicted_vote"] = np.round(raw_vote[:, 0], 2)
-        output["predicted_fantavoto"] = np.round(raw_fantasy[:, 0], 2)
+        vote_quantiles = np.array([
+            SinhArcsinhDistribution(*params).ppf([0.50])
+            for params in raw_vote
+        ]).reshape(-1)
+        fantasy_quantiles = np.array([
+            SinhArcsinhDistribution(*params).ppf([0.10, 0.50, 0.90])
+            for params in raw_fantasy
+        ])
+        output["predicted_vote"] = np.round(np.clip(vote_quantiles, 0.0, 10.0), 2)
+        output["predicted_fantavoto"] = np.round(
+            np.clip(fantasy_quantiles[:, 1], -5.0, 30.0), 2
+        )
         output["vote_dist_loc"] = raw_vote[:, 0]
         output["vote_dist_scale"] = raw_vote[:, 1]
         output["vote_dist_skewness"] = raw_vote[:, 2]
@@ -229,16 +250,9 @@ class FantacalcioPredictor:
         output["dist_skewness"] = raw_fantasy[:, 2]
         output["dist_tailweight"] = raw_fantasy[:, 3]
 
-        quantiles = np.array([
-            SinhArcsinhDistribution(*params).ppf([0.10, 0.50, 0.90])
-            for params in zip(
-                output["dist_loc"],
-                output["dist_scale"],
-                output["dist_skewness"],
-                output["dist_tailweight"],
-            )
-        ])
-        output[["floor_q10", "median_q50", "ceiling_q90"]] = np.round(quantiles, 2)
+        output[["floor_q10", "median_q50", "ceiling_q90"]] = np.round(
+            np.clip(fantasy_quantiles, -5.0, 30.0), 2
+        )
         output["predicted_matchday"] = matchday
         return output
 

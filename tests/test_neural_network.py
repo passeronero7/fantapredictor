@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+import numpy as np
 import pandas as pd
 
 from src.models.neural_network import FantacalcioPredictor
@@ -39,6 +40,10 @@ class NeuralNetworkPredictorTests(unittest.TestCase):
         # Attacker ceiling should be substantially higher than floor
         striker = preds[preds["role"] == "A"].iloc[0]
         self.assertGreater(striker["ceiling_q90"], striker["floor_q10"])
+        self.assertEqual(striker["predicted_fantavoto"], striker["median_q50"])
+        self.assertGreaterEqual(striker["predicted_vote"], 0.0)
+        self.assertLessEqual(striker["predicted_vote"], 10.0)
+        self.assertGreaterEqual(striker["floor_q10"], -5.0)
 
     def test_save_and_load_restores_predictions(self):
         rows = [
@@ -76,6 +81,17 @@ class NeuralNetworkPredictorTests(unittest.TestCase):
             self.assertTrue(
                 (expected["median_q50"].to_numpy() == actual["median_q50"].to_numpy()).all()
             )
+
+    def test_decode_params_bounds_extreme_network_outputs(self):
+        raw = np.array([[1e9, 1e9, 1e9, -1e9, -1e9, -1e9, -1e9, 1e9]])
+
+        decoded = FantacalcioPredictor._decode_params(raw)
+
+        self.assertTrue(np.isfinite(decoded).all())
+        self.assertLessEqual(decoded[0, 0], 20.0)
+        self.assertGreaterEqual(decoded[0, 4], 0.0)
+        self.assertLessEqual(decoded[0, 1], np.logaddexp(0.0, 5.0) + 0.1)
+        self.assertLessEqual(decoded[0, 2], 0.5)
 
 
 if __name__ == "__main__":
