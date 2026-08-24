@@ -1,10 +1,10 @@
 # Serie A 2026/27 roster scouting brief
 
-**Snapshot:** 24 August 2026. **Status:** watchlist-first and incomplete until the Italian summer window closes on 1 September 2026.
+**Snapshot:** 24 August 2026. **Status:** watchlist-first and incomplete until the Italian summer window closes on 1 September 2026 at 20:00 CEST.
 
 ## Competition population
 
-The 20 clubs in the first roster pass are: Atalanta, Bologna, Cagliari, Como, Fiorentina, Frosinone, Genoa, Inter, Juventus, Lazio, Lecce, Milan, Monza, Napoli, Parma, Roma, Sassuolo, Torino, Udinese, and Verona. This population is cross-checked against the current Serie A transfer tracker and the official league calendar.
+The 20 clubs in the first roster pass are: Atalanta, Bologna, Cagliari, Como, Fiorentina, Frosinone, Genoa, Inter, Juventus, Lazio, Lecce, Milan, Monza, Napoli, Parma, Roma, Sassuolo, Torino, Udinese, and Venezia. This population is cross-checked against the current Serie A transfer tracker and the official league calendar. Verona was relegated to Serie B after 2025/26 and is not part of the 2026/27 Serie A population.
 
 ## Roster policy
 
@@ -12,7 +12,7 @@ The 20 clubs in the first roster pass are: Atalanta, Bologna, Cagliari, Como, Fi
 2. Include only players registered or officially announced by a Serie A club as `confirmed`.
 3. Keep uncompleted negotiations under `watchlist`; do not expose them to model training, auction valuations, or lineup selection.
 4. Reconcile the file with official club squads and the fantasy-platform role list once published. Roles are provider-specific, so do not infer them from a transfer-site position.
-5. Refresh the source and timestamp immediately after 1 September and again after the winter window.
+5. Refresh the source and timestamp immediately after 1 September at 20:00 CEST and again after the winter window.
 
 ## Manual reconciliation workflow
 
@@ -84,3 +84,11 @@ role; all other baseline rows remain `watchlist`:
 The private roster currently contains 4 `confirmed` and 622 `watchlist` rows.
 It cannot yet form a legal `3-4-3` lineup. Re-run the release validator after
 each manual update.
+
+## Market-closure decision
+
+The current project decision is to make no further active-roster promotions
+before the market closes on 1 September 2026 at 20:00 Italian time (20:00
+CEST). At that point, refresh the definitive Serie A population and the
+Fantacalcio player/role list before reconciling the remaining rows. The expected
+club population includes Venezia and excludes relegated Verona.

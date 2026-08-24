@@ -22,7 +22,7 @@ evaluated, but the 2024/25 holdout currently shows the expanding-prior and
 global-median baselines outperforming it. See the [evaluation record](docs/evaluation_results.md)
 and [operations runbook](docs/operations_runbook.md).
 
-The 2026/27 roster research is a live dataset, not a frozen truth: the summer market closes on 1 September 2026. See the [scouting brief](docs/season_2026_27_roster_scouting.md) for the roster policy, club population, sources, and first confirmed-transfer reconciliation queue.
+The 2026/27 roster research is a live dataset, not a frozen truth: the summer market closes on 1 September 2026 at 20:00 Italian time (20:00 CEST). The current competition population includes Venezia and excludes relegated Verona. See the [scouting brief](docs/season_2026_27_roster_scouting.md) for the roster policy, club population, sources, and first confirmed-transfer reconciliation queue.
 
 ## Setup
 

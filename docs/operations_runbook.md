@@ -23,6 +23,10 @@ Allowed statuses are `confirmed`, `watchlist`, and `excluded`. Keep a player as
 `watchlist` until both club membership and fantasy role are evidenced. The
 public starter template is `config/roster_reconciliation.example.csv`.
 
+No further active-roster promotion is planned before the transfer market closes
+on 1 September 2026 at 20:00 Italian time (20:00 CEST). The post-closure
+refresh must use Venezia as a Serie A club and must exclude relegated Verona.
+
 ## Rebuild And Inspect SQLite
 
 Run from the private workspace. The repository has no dependency on the

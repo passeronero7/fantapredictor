@@ -40,6 +40,8 @@ All notable project changes are recorded here.
 - Full local source snapshot generated for analysis: 11 historical rating seasons, 33 match-result seasons, 124,122 player-match ratings, 11,726 matches, 46,866 odds rows, 539 current quotations, and 6,726 Understat player-season rows.
 - Documented the executed private-workspace rebuild, SQLite inspection results,
   roster reconciliation checkpoint, and model evaluation results.
+- Recorded the roster decision to include Venezia and exclude relegated Verona,
+  with definitive reconciliation deferred until 1 September 2026 at 20:00 CEST.
 - Dual-Repository security architecture and setup guide in `docs/repository_architecture_and_security.md` (Public Core for algorithms, Private Workspace for proprietary data).
 - Automated pre-commit leak-prevention hook (`.githooks/pre-commit`) blocking accidental commits of database files (`.db`, `.sqlite`), spreadsheets (`.xlsx`, `.xls`, `.parquet`), and secret tokens.
 - Hardened `.gitignore` excluding all credentials, database artifacts, private spreadsheets, and runtime logs.
