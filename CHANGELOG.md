@@ -16,6 +16,8 @@ All notable project changes are recorded here.
   legal budget-constrained Monte Carlo lineup results.
 - Added roster release validation, private source checksum manifests, and a
   private-workspace credential pre-commit hook.
+- Prediction generation now runs the strict confirmed-pool release gate before
+  loading a model artifact.
 - Release validation can now require a complete default 3-4-3 confirmed pool,
   not merely one confirmed record.
 - Versioned the roster-membership role in the SQLite schema with an additive

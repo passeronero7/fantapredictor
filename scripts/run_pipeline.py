@@ -210,6 +210,13 @@ class FantacalcioPipeline:
         logger.info("=" * 60)
         
         try:
+            roster_path = config.get_season_dir(self.season) / "rosters" / (
+                f"virgilio_rosters_{config.get_season_dir(self.season).name.removeprefix('season_')}.csv"
+            )
+            if roster_path.exists():
+                from scripts.validate_release import validate_roster
+
+                validate_roster(roster_path, require_confirmed=True, require_lineup=True)
             from src.models.neural_network import FantacalcioPredictor
             from src.data_processing.players_processor import PlayersProcessor
             from src.data_processing.prices_processor import merge_current_prices
