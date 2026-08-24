@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS roster_memberships (
     player_id     INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
     club_id       INTEGER NOT NULL REFERENCES clubs(id)   ON DELETE CASCADE,
     season_id     INTEGER NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
+    role          TEXT,                          -- fantasy-provider role for this season
     status        TEXT NOT NULL DEFAULT 'confirmed'
                   CHECK (status IN ('confirmed','watchlist','excluded')),
     source_url    TEXT,

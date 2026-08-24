@@ -9,6 +9,6 @@ FBref tables that are otherwise blocked against automation.
 # Keep in sync with pyproject.toml [project] version. The version follows
 # SemVer: bump the minor for any backwards-compatible addition to the schema
 # or ingestion surface, the major for breaking changes.
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = ["__version__"]

@@ -39,11 +39,26 @@ def evaluate(season: str, cutoff_matchday: int, epochs: int = 25) -> dict[str, o
     prediction_frame = pd.concat(predictions, ignore_index=True)
     train_frame = pd.concat([train_outfield, train_goalkeepers], ignore_index=True)
     baseline = prediction_frame.copy()
-    baseline["predicted_vote"] = train_frame["target_vote"].median()
-    baseline["predicted_fantavoto"] = train_frame["target_fantavoto"].median()
+    vote_median = train_frame["target_vote"].median()
+    fantasy_median = train_frame["target_fantavoto"].median()
+    baseline["predicted_vote"] = vote_median
+    baseline["predicted_fantavoto"] = fantasy_median
     baseline["floor_q10"] = train_frame["target_fantavoto"].quantile(0.10)
-    baseline["median_q50"] = train_frame["target_fantavoto"].quantile(0.50)
+    baseline["median_q50"] = fantasy_median
     baseline["ceiling_q90"] = train_frame["target_fantavoto"].quantile(0.90)
+    prior_baseline = prediction_frame.copy()
+    prior_vote = pd.to_numeric(prior_baseline.get("mean_vote"), errors="coerce").fillna(vote_median)
+    prior_fantasy = pd.to_numeric(
+        prior_baseline.get("mean_fantavoto"), errors="coerce"
+    ).fillna(fantasy_median)
+    train_prior = pd.to_numeric(train_frame.get("mean_fantavoto"), errors="coerce")
+    train_prior = train_prior.fillna(fantasy_median)
+    residuals = train_frame["target_fantavoto"] - train_prior
+    prior_baseline["predicted_vote"] = prior_vote
+    prior_baseline["predicted_fantavoto"] = prior_fantasy
+    prior_baseline["floor_q10"] = prior_fantasy + residuals.quantile(0.10)
+    prior_baseline["median_q50"] = prior_fantasy + residuals.quantile(0.50)
+    prior_baseline["ceiling_q90"] = prior_fantasy + residuals.quantile(0.90)
     result: dict[str, object] = {
         "season": season,
         "cutoff_matchday": cutoff_matchday,
@@ -51,6 +66,7 @@ def evaluate(season: str, cutoff_matchday: int, epochs: int = 25) -> dict[str, o
         "test_rows": int(len(prediction_frame)),
         "overall": score_predictions(prediction_frame),
         "baseline": score_predictions(baseline),
+        "expanding_prior_baseline": score_predictions(prior_baseline),
     }
     if "role" in prediction_frame.columns:
         result["by_role"] = {

@@ -26,6 +26,8 @@ def merge_current_prices(players_df: pd.DataFrame, prices_df: pd.DataFrame) -> p
         return output
     if "player_normalized" not in output.columns:
         output["player_normalized"] = output["player"].map(normalize_name)
+    if "role" in output.columns:
+        output["role"] = output["role"].astype(object)
 
     canonical_names = output["player"].astype(str).map(normalize_name)
     exact = {}

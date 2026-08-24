@@ -14,7 +14,7 @@ def load_rosters(conn: sqlite3.Connection, season: str) -> pd.DataFrame:
     return pd.read_sql_query(
         """
         SELECT p.full_name AS player, p.normalized_name AS player_normalized,
-               c.name AS club_2026_27, p.role, rm.status, rm.source_url,
+               c.name AS club_2026_27, rm.role, rm.status, rm.source_url,
                rm.checked_at
         FROM roster_memberships AS rm
         JOIN players AS p ON p.id = rm.player_id

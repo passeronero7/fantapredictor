@@ -48,12 +48,14 @@ def load(conn, path: str | Path, season: str) -> int:
             status = row["status"]
             conn.execute(
                 """INSERT INTO roster_memberships
-                   (player_id, club_id, season_id, status, source_url, checked_at)
-                   VALUES (?, ?, ?, ?, ?, ?)
+                   (player_id, club_id, season_id, role, status, source_url, checked_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(player_id, club_id, season_id)
-                   DO UPDATE SET status=excluded.status, source_url=excluded.source_url,
+                   DO UPDATE SET role=excluded.role, status=excluded.status,
+                     source_url=excluded.source_url,
                      checked_at=excluded.checked_at""",
-                (pid, cid, season_id, status, row.get("source_url"), row.get("checked_at")),
+                (pid, cid, season_id, row.get("role") or None, status,
+                 row.get("source_url"), row.get("checked_at")),
             )
             loaded += 1
         finish_run(conn, run_id, "ok", loaded)

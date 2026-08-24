@@ -29,7 +29,7 @@ class PricesProcessorTests(unittest.TestCase):
         players = pd.DataFrame([{
             "player": "Lautaro Martinez",
             "player_normalized": "lautaro martinez",
-            "role": "F",
+            "role": "",
         }])
         prices = pd.DataFrame([{
             "player": "Martinez L.",

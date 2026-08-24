@@ -31,6 +31,10 @@ class SchemaTests(unittest.TestCase):
         self.assertIn("matches", tables)
         self.assertIn("player_season_stats", tables)
         self.assertIn("roster_memberships", tables)
+        columns = {
+            row["name"] for row in self.conn.execute("PRAGMA table_info(roster_memberships)")
+        }
+        self.assertIn("role", columns)
         self.assertIn("match_odds", tables)
         self.assertIn("ingestion_runs", tables)
 

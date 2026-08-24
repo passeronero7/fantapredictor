@@ -34,6 +34,7 @@ python scripts/download_historical_votes.py --season 2024-25 --start 1 --end 38
 python scripts/download_current_prices.py --season 2026-27
 python scripts/download_match_results.py --start-year 1993 --end-year 2025
 python scripts/build_database.py --db data/fantapredictor.db --season 2627
+python scripts/inspect_database.py --db data/fantapredictor.db summary
 
 # Run data pipeline stages
 python scripts/run_pipeline.py --stage manual-fbref --season 2627
@@ -49,7 +50,7 @@ Before an auction or model run, validate the private snapshot:
 
 ```bash
 FANTAPREDICTOR_DATA_DIR=/path/to/fantapredictor-workspace/data \
-  python scripts/validate_release.py --season 2627 --require-confirmed
+  python scripts/validate_release.py --season 2627 --require-confirmed --require-lineup
 ```
 
 When running the core from the private workspace, point it at the workspace

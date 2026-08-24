@@ -81,6 +81,17 @@ The build is idempotent for domain rows. Re-running it updates the same natural
 keys instead of duplicating players, ratings, matches, odds, or prices. Every
 run is recorded in `ingestion_runs`.
 
+If the `sqlite3` shell is unavailable, inspect the warehouse with the bundled
+standard-library CLI:
+
+```bash
+python scripts/inspect_database.py --db data/fantapredictor.db summary
+python scripts/inspect_database.py --db data/fantapredictor.db sql \
+  "SELECT status, COUNT(*) FROM roster_memberships GROUP BY status"
+python scripts/inspect_database.py --db data/fantapredictor.db sql \
+  "SELECT name, COUNT(*) FROM sqlite_master WHERE type = 'table' GROUP BY name"
+```
+
 Optional curated coach history can be loaded with:
 
 ```bash
@@ -130,8 +141,9 @@ python scripts/optimize_lineup.py --season 2627 --matchday 1 \
 The output contains the selected starters, total cost, budget remaining, base
 points, defence modifier contribution, and simulation q10/q50/q90 results.
 
-Use `scripts/validate_release.py --require-confirmed` before an auction. It
-fails if roster provenance is missing, statuses are invalid, confirmed roles
-are absent, or no confirmed player exists. The private workspace can record a
+Use `scripts/validate_release.py --require-confirmed --require-lineup` before
+an auction. It fails if roster provenance is missing, statuses are invalid,
+confirmed roles are absent, no confirmed player exists, or the confirmed pool
+cannot form the default 3-4-3 lineup. The private workspace can record a
 checksum manifest with `scripts/create_data_manifest.py`; generated models and
 prediction exports remain excluded from that source manifest.

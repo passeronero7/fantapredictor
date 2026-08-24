@@ -14,6 +14,37 @@ The 20 clubs in the first roster pass are: Atalanta, Bologna, Cagliari, Como, Fi
 4. Reconcile the file with official club squads and the fantasy-platform role list once published. Roles are provider-specific, so do not infer them from a transfer-site position.
 5. Refresh the source and timestamp immediately after 1 September and again after the winter window.
 
+## Manual reconciliation workflow
+
+Use the public Virgilio listing only to seed candidates. Reconcile each row in
+the private workspace roster file using this evidence order:
+
+1. Official announcement or first-team squad page from the destination club.
+2. The official Serie A club registry and competition calendar for the league
+   population.
+3. The official Fantacalcio quotation page for `role`, current price, and the
+   fantasy-platform player identity.
+4. Reputable transfer trackers for discovery and cross-checking only. They do
+   not replace a club announcement for a `confirmed` assertion.
+
+The working file is
+`fantapredictor-workspace/data/season_2026_27/rosters/virgilio_rosters_2026_27.csv`.
+It must contain `player`, `club`, `role`, `status`, `source_url`, and
+`checked_at`. Keep unresolved rows as `watchlist`, departed/ineligible rows as
+`excluded`, and promote a row only when its club and fantasy role are evidenced.
+The public template is `config/roster_reconciliation.example.csv`.
+
+Useful primary sources:
+
+- [Lega Serie A 2026/27 calendar](https://www.legaseriea.it/serie-a/news/calendario-della-serie-a-enilive-2026-27)
+- [Fantacalcio quotations and roles](https://www.fantacalcio.it/quotazioni-fantacalcio)
+- Official club websites and verified club announcements for each individual assertion
+
+The [Football Italia tracker](https://football-italia.net/live-done-deal-tracker-latest-serie-a-transfer/)
+and [SoccerNews confirmed-transfer page](https://www.soccernews.com/soccer-transfers/italian-serie-a-transfers/)
+are useful discovery sources, but rumours, medicals, agreements, and transfer
+probabilities must remain outside the confirmed dataset.
+
 ## Confirmed-transfer watch items
 
 These are examples to seed the first reconciliation pass, not a complete squad list:

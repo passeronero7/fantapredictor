@@ -16,6 +16,14 @@ All notable project changes are recorded here.
   legal budget-constrained Monte Carlo lineup results.
 - Added roster release validation, private source checksum manifests, and a
   private-workspace credential pre-commit hook.
+- Release validation can now require a complete default 3-4-3 confirmed pool,
+  not merely one confirmed record.
+- Versioned the roster-membership role in the SQLite schema with an additive
+  migration so provider roles cannot be overwritten by unrelated source roles.
+- Centered SHASH predictions on expanding prior-vote/fantavoto features with a
+  learned residual correction, making the model's baseline comparison fairer.
+- Added a manual roster reconciliation template and a read-only SQLite
+  inspection CLI for environments without the `sqlite3` shell.
 - In-depth evaluation of USA football probabilistic modeling (`amiles2233/ff_prob`) and architectural blueprint in `docs/probabilistic_modeling_and_ff_prob_evaluation.md`.
 - Sinh-Arcsinh (SHASH) distribution module (`src/models/distributions.py`) implementing 4-parameter asymmetric, heavy-tailed fantasy scoring density with PDF, CDF, quantile (PPF), sampling (RVS), and MLE fitting.
 - Fantacalcio weekly vote processing engine (`src/data_processing/votes_processor.py`) supporting Italian spreadsheet formats and robust decimal/delimiter parsing.

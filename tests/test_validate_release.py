@@ -21,6 +21,18 @@ class ReleaseValidationTests(unittest.TestCase):
                 {"confirmed": 1, "excluded": 0, "watchlist": 1},
             )
 
+    def test_rejects_confirmed_pool_that_cannot_form_default_lineup(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "roster.csv"
+            path.write_text(
+                "player,club,role,status,source_url,checked_at\n"
+                "Confirmed,Test FC,A,confirmed,https://example.test,2026-08-24\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(ValueError):
+                validate_roster(path, require_lineup=True)
+
     def test_requires_a_role_for_confirmed_records(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "roster.csv"

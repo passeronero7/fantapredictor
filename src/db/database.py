@@ -111,8 +111,18 @@ def init_schema(conn: sqlite3.Connection, schema_file: str | Path | None = None)
     """Create all tables and indexes defined in the schema if they don't exist."""
     schema_file = Path(schema_file) if schema_file else SCHEMA_FILE
     conn.executescript(schema_file.read_text(encoding="utf-8"))
+    _migrate_schema(conn)
     _seed_sources(conn)
     conn.commit()
+
+
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    """Apply additive migrations to databases created by earlier core versions."""
+    roster_columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(roster_memberships)")
+    }
+    if "role" not in roster_columns:
+        conn.execute("ALTER TABLE roster_memberships ADD COLUMN role TEXT")
 
 
 def _seed_sources(conn: sqlite3.Connection) -> None:

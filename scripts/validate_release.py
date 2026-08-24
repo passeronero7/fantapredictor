@@ -17,7 +17,11 @@ VALID_STATUSES = {"confirmed", "watchlist", "excluded"}
 REQUIRED_COLUMNS = {"player", "role", "status", "source_url", "checked_at"}
 
 
-def validate_roster(path: str | Path, require_confirmed: bool = False) -> dict[str, int]:
+def validate_roster(
+    path: str | Path,
+    require_confirmed: bool = False,
+    require_lineup: bool = False,
+) -> dict[str, int]:
     """Validate a roster CSV and return status counts."""
     path = Path(path)
     with path.open(newline="", encoding="utf-8") as handle:
@@ -30,6 +34,7 @@ def validate_roster(path: str | Path, require_confirmed: bool = False) -> dict[s
             raise ValueError("Roster is missing required column: club")
 
         counts = {status: 0 for status in sorted(VALID_STATUSES)}
+        role_counts: dict[str, int] = {}
         for line_number, row in enumerate(reader, start=2):
             status = (row.get("status") or "").strip().lower()
             if status not in VALID_STATUSES:
@@ -40,9 +45,24 @@ def validate_roster(path: str | Path, require_confirmed: bool = False) -> dict[s
             if status == "confirmed" and not (row.get("role") or "").strip():
                 raise ValueError(f"Confirmed roster line {line_number} has no role")
             counts[status] += 1
+            if status == "confirmed":
+                role = (row.get("role") or "").strip().upper()
+                role_counts[role] = role_counts.get(role, 0) + 1
 
     if require_confirmed and counts["confirmed"] == 0:
         raise ValueError("No confirmed roster records are available")
+    if require_lineup:
+        required_roles = {"P": 1, "D": 3, "C": 4, "A": 3}
+        missing_roles = {
+            role: minimum - role_counts.get(role, 0)
+            for role, minimum in required_roles.items()
+            if role_counts.get(role, 0) < minimum
+        }
+        if missing_roles:
+            raise ValueError(
+                "Confirmed roster cannot form the default 3-4-3 lineup: "
+                + ", ".join(f"{role} needs {count} more" for role, count in missing_roles.items())
+            )
     return counts
 
 
@@ -51,12 +71,17 @@ def main() -> None:
     parser.add_argument("--season", default="2627")
     parser.add_argument("--roster", type=Path)
     parser.add_argument("--require-confirmed", action="store_true")
+    parser.add_argument("--require-lineup", action="store_true")
     args = parser.parse_args()
     roster = args.roster or (
         config.get_season_dir(args.season) / "rosters" /
         f"virgilio_rosters_{config.get_season_dir(args.season).name.removeprefix('season_')}.csv"
     )
-    counts = validate_roster(roster, require_confirmed=args.require_confirmed)
+    counts = validate_roster(
+        roster,
+        require_confirmed=args.require_confirmed,
+        require_lineup=args.require_lineup,
+    )
     print(f"Roster: {roster}")
     print(f"Status counts: {counts}")
 

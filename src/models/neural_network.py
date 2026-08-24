@@ -45,6 +45,8 @@ class FantacalcioPredictor:
         self.goalkeeper_model = None
         self.version: Optional[str] = None
         self.is_fitted = False
+        self.training_vote_median = 6.0
+        self.training_fantasy_median = 6.0
 
     @staticmethod
     def _tf():
@@ -141,6 +143,9 @@ class FantacalcioPredictor:
             raise ValueError("No observed player-match data supplied")
         frames = [frame for frame in (outfield_data, gk_data) if not frame.empty]
         all_features = pd.concat([self._feature_frame(frame) for frame in frames], ignore_index=True)
+        all_targets = np.concatenate([self._targets(frame) for frame in frames], axis=0)
+        self.training_vote_median = float(np.median(all_targets[:, 0]))
+        self.training_fantasy_median = float(np.median(all_targets[:, 1]))
         self.scaler.fit(all_features)
         tf = self._tf()
         tf.keras.utils.set_random_seed(42)
@@ -229,6 +234,19 @@ class FantacalcioPredictor:
             raw_vote[is_gk] = params[:, :4]
             raw_fantasy[is_gk] = params[:, 4:]
 
+        # Predict residuals around the prior-only expanding averages when they
+        # are available. This protects the model from discarding a strong
+        # observed prior while still allowing learned feature corrections.
+        for matrix, column, fallback in (
+            (raw_vote, "mean_vote", self.training_vote_median),
+            (raw_fantasy, "mean_fantavoto", self.training_fantasy_median),
+        ):
+            prior = pd.to_numeric(
+                output.get(column, pd.Series(np.nan, index=output.index)), errors="coerce"
+            ).to_numpy(dtype=float)
+            prior = np.where(np.isfinite(prior) & (prior > 0.0), prior, fallback)
+            matrix[:, 0] = 0.8 * prior + 0.2 * matrix[:, 0]
+
         vote_quantiles = np.array([
             SinhArcsinhDistribution(*params).ppf([0.50])
             for params in raw_vote
@@ -278,6 +296,8 @@ class FantacalcioPredictor:
             "feature_columns": self.feature_columns,
             "scaler_mean": self.scaler.mean_.tolist(),
             "scaler_scale": self.scaler.scale_.tolist(),
+            "training_vote_median": self.training_vote_median,
+            "training_fantasy_median": self.training_fantasy_median,
             "artifacts": artifacts,
         }
         metadata_path = self.models_dir / f"model_meta_{version}.json"
@@ -311,4 +331,6 @@ class FantacalcioPredictor:
         self.scaler.n_features_in_ = len(self.feature_columns)
         self.scaler.feature_names_in_ = np.asarray(self.feature_columns, dtype=object)
         self.version = metadata["version"]
+        self.training_vote_median = metadata.get("training_vote_median", 6.0)
+        self.training_fantasy_median = metadata.get("training_fantasy_median", 6.0)
         self.is_fitted = True
