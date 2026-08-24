@@ -40,7 +40,7 @@ Use official/Fantacalcio data for eligibility, roles, and votes; use Understat/F
 
 `scripts/download_baseline_data.py --season 2627` completed successfully and produced:
 
-- 20 clubs and 626 provisional roster entries from Virgilio Sport;
+- 20 clubs and 626 watchlist-first roster entries from Virgilio Sport;
 - 2,056 matched player-season rows from the Understat archive;
 - 419 roster players with at least one open-data historical row;
 - 207 roster players without a match, principally academy/newer players and players whose history falls outside Understat’s six-league coverage;

@@ -15,6 +15,13 @@ The codebase implements:
 - Monte Carlo lineup optimizer with formation constraints and Serie A *Modificatore Difesa* bonus calculations (`src/models/lineup_optimizer.py`).
 - Offline source ingestors and a reproducible SQLite builder (`scripts/build_database.py`).
 
+The current release is not an auction-ready prediction release. The active
+2026/27 snapshot contains 4 confirmed players and 622 watchlist players, so it
+cannot form a legal default 3-4-3 squad. The SHASH model is implemented and
+evaluated, but the 2024/25 holdout currently shows the expanding-prior and
+global-median baselines outperforming it. See the [evaluation record](docs/evaluation_results.md)
+and [operations runbook](docs/operations_runbook.md).
+
 The 2026/27 roster research is a live dataset, not a frozen truth: the summer market closes on 1 September 2026. See the [scouting brief](docs/season_2026_27_roster_scouting.md) for the roster policy, club population, sources, and first confirmed-transfer reconciliation queue.
 
 ## Setup

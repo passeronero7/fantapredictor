@@ -1,4 +1,4 @@
-"""Offline loader for the provisional Virgilio roster snapshot."""
+"""Offline loader for the watchlist-first Virgilio roster snapshot."""
 
 from __future__ import annotations
 

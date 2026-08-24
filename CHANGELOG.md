@@ -2,7 +2,7 @@
 
 All notable project changes are recorded here.
 
-## [Unreleased] - 2026-08-23
+## [Unreleased] - 2026-08-24
 
 ### Added
 
@@ -38,11 +38,12 @@ All notable project changes are recorded here.
 - Normalized SQLite ingestors for Understat, rosters, official ratings, Football-Data match results/odds, quotations, and curated coach history, plus `scripts/build_database.py`.
 - Public Fantacalcio quotation parser and downloader (`scripts/download_current_prices.py`) providing current classic/mantra roles, prices, and FVM values.
 - Full local source snapshot generated for analysis: 11 historical rating seasons, 33 match-result seasons, 124,122 player-match ratings, 11,726 matches, 46,866 odds rows, 539 current quotations, and 6,726 Understat player-season rows.
-- Full local source snapshot generated for analysis: 11 historical rating seasons, 33 match-result seasons, 124,122 player-match ratings, 11,726 matches, 46,866 odds rows, and 6,726 Understat player-season rows.
+- Documented the executed private-workspace rebuild, SQLite inspection results,
+  roster reconciliation checkpoint, and model evaluation results.
 - Dual-Repository security architecture and setup guide in `docs/repository_architecture_and_security.md` (Public Core for algorithms, Private Workspace for proprietary data).
 - Automated pre-commit leak-prevention hook (`.githooks/pre-commit`) blocking accidental commits of database files (`.db`, `.sqlite`), spreadsheets (`.xlsx`, `.xls`, `.parquet`), and secret tokens.
 - Hardened `.gitignore` excluding all credentials, database artifacts, private spreadsheets, and runtime logs.
-- Comprehensive unit tests covering distributions, vote parsing, player merging, quotations, database ingestors, deep predictor, and lineup optimization (35 passing tests).
+- Comprehensive unit tests covering distributions, vote parsing, player merging, quotations, database ingestors, deep predictor, release validation, and lineup optimization (45 passing tests).
 
 ### Changed
 

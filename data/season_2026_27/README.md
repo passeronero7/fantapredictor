@@ -12,5 +12,5 @@ pipeline creates required child directories automatically. Do not place
 rumours in the confirmed roster dataset.
 
 Run `python scripts/download_baseline_data.py --season 2627` to create a
-provisional roster snapshot plus all available historical Understat rows for
+watchlist-first roster snapshot plus all available historical Understat rows for
 those players. See `docs/free_data_sources.md` for coverage and limitations.

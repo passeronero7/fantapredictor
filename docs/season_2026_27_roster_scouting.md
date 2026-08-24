@@ -1,6 +1,6 @@
 # Serie A 2026/27 roster scouting brief
 
-**Snapshot:** 22 August 2026 (opening weekend). **Status:** provisional until the Italian summer window closes on 1 September 2026.
+**Snapshot:** 24 August 2026. **Status:** watchlist-first and incomplete until the Italian summer window closes on 1 September 2026.
 
 ## Competition population
 
@@ -68,3 +68,19 @@ These are examples to seed the first reconciliation pass, not a complete squad l
 - [Serie A confirmed-transfer tracker, updated 22 August](https://www.soccernews.com/soccer-transfers/italian-serie-a-transfers/)
 
 The third-party trackers are useful for discovery; club announcements and the final fantasy-platform list take precedence when they conflict.
+
+## Latest Reconciliation Checkpoint
+
+Checked on 24 August 2026. Four rows have both club evidence and a fantasy
+role; all other baseline rows remain `watchlist`:
+
+| Player | Club | Role | Primary evidence |
+|---|---|---|---|
+| Alieu Fadera | Cagliari | C | [Como 1907 announcement](https://x.com/Como_1907/status/2090887713461342366) |
+| Curtis Jones | Inter | C | [Inter announcement](https://www.inter.it/en/news/curtis-jones-new-inter-player) |
+| Diego Moreira | Milan | C | [AC Milan announcement](https://www.acmilan.com/it/news/articoli/media/2026-08-19/comunicato-ufficiale-diego-moreira) |
+| Niccolò Fortini | Torino | D | [Torino announcement](https://x.com/TorinoFC_1906/status/2090733807263477882) |
+
+The private roster currently contains 4 `confirmed` and 622 `watchlist` rows.
+It cannot yet form a legal `3-4-3` lineup. Re-run the release validator after
+each manual update.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a dated Serie A roster snapshot and deep open-data player histories.
+"""Create a dated Serie A watchlist snapshot and open-data player histories.
 
 The roster source is a public, current-season listing and may change while the
 transfer window is open. Historical rows come from a public Understat-derived
