@@ -62,6 +62,27 @@ Promote only manually reconciled records to `confirmed`, keeping unresolved
 players as `watchlist` or `excluded`. Downstream player processing fails closed
 and admits confirmed records only.
 
+For the in-progress current season, retrieve one public Understat snapshot and
+then rebuild. The snapshot retains xG, xA, npxG, shots, key passes, xGChain,
+and xGBuildup:
+
+```bash
+python scripts/download_understat_season.py --season 2026
+python scripts/build_database.py --season 2627
+```
+
+Refresh official incoming transfers with the Lega Serie A public Calciomercato
+feed. Every change gets an official per-transfer URL and a retrieval timestamp;
+missing official role labels remain watchlist rather than being guessed:
+
+```bash
+python scripts/reconcile_official_transfers.py --season 2627
+python scripts/validate_release.py --season 2627 --require-confirmed --require-lineup
+```
+
+See [club-grade data strategy](club_grade_data_strategy.md) for the lawful
+source hierarchy, snapshot policy, and analysis features.
+
 ## Build the Warehouse
 
 ```bash

@@ -14,6 +14,8 @@
 | Squad and transfer confirmation | Official club announcements + Lega Serie A | Public web pages | Use for roster truth. Do not populate confirmed roster records from rumours or undocumented APIs. |
 | Current club/player index | [Virgilio Sport Serie A player list](https://sport.virgilio.it/calcio/giocatori/) | HTTP 200 | Provisional 20-club roster snapshot, refreshed on every run. It does not define fantasy roles. |
 | Deep historical player seasons | [Understat aggregated archive](https://github.com/vibedatascience/understat_players_aggregated) | 7 MB public CSV | Download and retain all matched player-season rows across the six covered leagues, with Understat player IDs. |
+| In-season player event profile | [Understat Serie A league page](https://understat.com/league/Serie_A/2026) | Public league-page data | Retrieve one documented project snapshot at a time for xG, xA, shots, key passes, xGChain, and xGBuildup; retain timestamp and do not bulk-harvest. |
+| Formal incoming transfers | [Lega Serie A Calciomercato](https://www.legaseriea.it/serie-a/calciomercato) | Public official feed | Use the directed, dated registration record for club assignment; preserve the individual official source URL. |
 
 ## Sources not selected for automation
 

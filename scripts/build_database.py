@@ -32,7 +32,13 @@ def build(
         roster_path or season_dir / "rosters" /
         f"virgilio_rosters_{season_dir.name.removeprefix('season_')}.csv"
     )
-    understat_path = Path(understat_path or season_dir / "raw" / "understat_players_aggregated_2014_td.csv")
+    if understat_path is not None:
+        understat_paths = [Path(understat_path)]
+    else:
+        raw_dir = season_dir / "raw"
+        understat_paths = [raw_dir / "understat_players_aggregated_2014_td.csv"]
+        understat_paths.extend(sorted(raw_dir.glob("understat_serie_a_*_season.csv")))
+        understat_paths = list(dict.fromkeys(understat_paths))
     explicit_votes_dir = votes_dir is not None
     votes_dir = Path(votes_dir or season_dir / "fantacalcio" / config.VOTES_DIR)
     matches_dir = Path(matches_dir or config.DATA_DIR / "raw" / "football-data.co.uk")
@@ -43,8 +49,12 @@ def build(
     database.init_schema(conn)
     counts: dict[str, int] = {}
     try:
-        if understat_path.exists():
-            counts["understat"] = understat.load(conn, understat_path)
+        understat_loaded = 0
+        for path in understat_paths:
+            if path.exists():
+                understat_loaded += understat.load(conn, path)
+        if understat_loaded:
+            counts["understat"] = understat_loaded
         if roster_path.exists():
             counts["rosters"] = rosters.load(conn, roster_path, season)
         if explicit_votes_dir:

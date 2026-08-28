@@ -11,6 +11,10 @@
   `fbref_` to preserve source semantics.
 - Understat `xGChain` and `xGBuildup` are retained in the player-season store
   and surfaced in historical player data.
+- Reproducible download of a single current Understat Serie A snapshot and
+  formal-roster reconciliation from Lega Serie A's public transfer feed.
+- Club-grade data strategy covering lawful source layers, deep player features,
+  provenance, snapshot timing, and leakage-safe modelling.
 
 ### Fixed
 
