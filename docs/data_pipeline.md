@@ -9,7 +9,9 @@ The project separates network retrieval from local ingestion:
 
 FBref is the exception to automated downloads. Export the required tables in a
 browser and place them under `data/season_<season>/manual/`; the pipeline only
-validates and reads those local CSVs.
+validates and reads those local CSVs. The warehouse imports every numeric
+column with its source file, table category, original FBref header, and a
+normalized metric key.
 
 ## Source Downloads
 
@@ -75,7 +77,29 @@ pipeline retrieval; raw files are inputs to the builder, not model inputs.
 The default build scans all `data/season_*/fantacalcio/voti/` directories, so
 all downloaded historical vote seasons are loaded. It also loads the current
 Understat archive, current roster snapshot, Football-Data match files, and the
-current quotation CSV when present.
+current quotation CSV when present. If a `manual/` directory exists, it also
+imports local FBref exports. Supported filenames are:
+
+```text
+fbref_standard_<season>.csv           fbref_shooting_<season>.csv
+fbref_passing_<season>.csv            fbref_pass_types_<season>.csv
+fbref_goal_shot_creation_<season>.csv fbref_defense_<season>.csv
+fbref_possession_<season>.csv         fbref_playing_time_<season>.csv
+fbref_misc_<season>.csv               fbref_keeper_<season>.csv
+fbref_advanced_keeper_<season>.csv
+```
+
+`fbref_scouting_<season>.csv` remains supported as a legacy filename. Each
+file must contain a `Player`/`player` column; `Squad`/`Team` is strongly
+recommended. Values are exposed with an `fbref_` prefix in player merges, so
+they cannot be confused with official Fantacalcio votes or targets. Do not use
+season-end aggregate exports as features for earlier matchdays: they are useful
+for scouting and research, but would leak future information into training.
+
+The Understat archive also retains `xGChain` and `xGBuildup` in the stable
+player-season table, alongside xG, xA, npxG, shots, key passes, and event
+totals. These two measures capture a player's involvement in moves that end in
+an expected-goal chance and in the build-up before the final action.
 
 The build is idempotent for domain rows. Re-running it updates the same natural
 keys instead of duplicating players, ratings, matches, odds, or prices. Every

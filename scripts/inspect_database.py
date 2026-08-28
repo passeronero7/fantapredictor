@@ -17,7 +17,7 @@ from src.db import __version__ as schema_version
 TABLES = (
     "sources", "ingestion_runs", "clubs", "players", "seasons",
     "roster_memberships", "matches", "match_team_stats", "match_odds",
-    "player_season_stats", "player_match_ratings", "player_prices",
+    "player_season_stats", "player_season_stat_values", "player_match_ratings", "player_prices",
 )
 
 

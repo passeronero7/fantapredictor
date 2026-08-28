@@ -18,8 +18,8 @@ class DatabaseIngestorTests(unittest.TestCase):
             root = Path(temporary)
             understat = root / "understat.csv"
             understat.write_text(
-                "player_name,id,team_title,year,league,primary_position,games,time,goals,assists,npg,npxG,xG,xA,shots,key_passes,yellow_cards,red_cards\n"
-                "Test Defender,101,Test FC,2024,Serie_A,D,20,1800,2,3,2,1.2,2.0,3.0,20,10,2,0\n",
+                "player_name,id,team_title,year,league,primary_position,games,time,goals,assists,npg,npxG,xG,xA,xGChain,xGBuildup,shots,key_passes,yellow_cards,red_cards\n"
+                "Test Defender,101,Test FC,2024,Serie_A,D,20,1800,2,3,2,1.2,2.0,3.0,4.5,1.5,20,10,2,0\n",
                 encoding="utf-8",
             )
 
@@ -87,7 +87,40 @@ class DatabaseIngestorTests(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM matches").fetchone()[0], 1)
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM player_season_stats").fetchone()[0], 1)
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM match_odds").fetchone()[0], 1)
+            self.assertEqual(
+                connection.execute(
+                    "SELECT xg_chain, xg_buildup FROM player_season_stats"
+                ).fetchone(),
+                (4.5, 1.5),
+            )
             connection.close()
+
+    def test_build_imports_all_numeric_manual_fbref_metrics_idempotently(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manual_dir = root / "manual"
+            manual_dir.mkdir()
+            (manual_dir / "fbref_passing_2425.csv").write_text(
+                "Player,Squad,Progressive Passes,Pass Completion %\n"
+                "Test Midfielder,Test FC,42,87.5%\n",
+                encoding="utf-8",
+            )
+            db_path = root / "fantapredictor.db"
+            first = build(db_path, manual_fbref_dir=manual_dir, season="2425")
+            second = build(db_path, manual_fbref_dir=manual_dir, season="2425")
+
+            self.assertEqual(first["fbref"], 2)
+            self.assertEqual(second["fbref"], 2)
+            import sqlite3
+            connection = sqlite3.connect(db_path)
+            metrics = connection.execute(
+                "SELECT metric, metric_label, value FROM player_season_stat_values ORDER BY metric"
+            ).fetchall()
+            connection.close()
+            self.assertEqual(metrics, [
+                ("pass_completion", "Pass Completion %", 87.5),
+                ("progressive_passes", "Progressive Passes", 42.0),
+            ])
 
     def test_roster_ingestor_rejects_invalid_status(self):
         with tempfile.TemporaryDirectory() as temporary:

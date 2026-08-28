@@ -38,6 +38,7 @@ def load_player_history(conn: sqlite3.Connection, league: str = "Serie_A") -> pd
                s.start_year AS year, ps.games, ps.minutes AS time,
                ps.goals, ps.assists, ps.goals_pens AS npg,
                ps.npxg AS npxG, ps.xg AS xG, ps.xa AS xA, ps.shots,
+               ps.xg_chain AS xGChain, ps.xg_buildup AS xGBuildup,
                ps.key_passes, ps.yellow_cards, ps.red_cards
         FROM player_season_stats AS ps
         JOIN players AS p ON p.id = ps.player_id
@@ -92,3 +93,38 @@ def load_prices(conn: sqlite3.Connection, season: str) -> pd.DataFrame:
         conn,
         params=(season_label(season),),
     )
+
+
+def load_player_skill_stats(conn: sqlite3.Connection, season: str) -> pd.DataFrame:
+    """Return manually imported FBref metrics as one row per player.
+
+    Columns are prefixed with ``fbref_`` so downstream code cannot mistake
+    these provider-specific measurements for Fantacalcio targets.  Only data
+    placed in local manual exports is returned; this function never accesses
+    FBref or another remote service.
+    """
+    frame = pd.read_sql_query(
+        """
+        SELECT p.normalized_name AS player_normalized,
+               v.category || '_' || v.metric AS metric_key,
+               v.value
+        FROM player_season_stat_values AS v
+        JOIN players AS p ON p.id = v.player_id
+        JOIN seasons AS s ON s.id = v.season_id
+        JOIN sources AS src ON src.id = v.source_id
+        WHERE s.name = ? AND src.slug = 'fbref'
+        ORDER BY v.source_file, v.id
+        """,
+        conn,
+        params=(season_label(season),),
+    )
+    if frame.empty:
+        return pd.DataFrame(columns=["player_normalized"])
+    wide = frame.pivot_table(
+        index="player_normalized", columns="metric_key", values="value", aggfunc="last"
+    ).reset_index()
+    wide.columns = [
+        column if column == "player_normalized" else f"fbref_{column}"
+        for column in wide.columns
+    ]
+    return wide

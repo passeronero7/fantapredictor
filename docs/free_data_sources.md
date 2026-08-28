@@ -18,7 +18,9 @@
 ## Sources not selected for automation
 
 - **FBref:** the project does not automate access. Use browser-exported tables
-  under the season `manual/` directory and let the local validator load them.
+  under the season `manual/` directory. The offline importer retains numeric
+  passing, shooting, creation, defensive, possession, playing-time, misc, and
+  goalkeeper fields with category/file provenance.
 - **Sofascore, FotMob, Transfermarkt:** useful for human research but their commonly circulated endpoints are undocumented. Do not make them a production dependency without permission and stable terms.
 - **Commercial APIs:** can improve coverage but are outside the free-first scope.
 

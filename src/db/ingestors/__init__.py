@@ -10,3 +10,7 @@ one source's raw files into the given SQLite connection. Ingestors must be:
   * **Self-contained** — third-party dependencies are imported lazily inside
     the function body and documented in the module docstring.
 """
+
+__all__ = [
+    "coaches", "fbref", "football_data", "prices", "rosters", "understat", "votes",
+]

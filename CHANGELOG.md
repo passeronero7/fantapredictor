@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.5.0] - 2026-08-28
+
+### Added
+
+- Offline ingestion of browser-exported FBref player tables into a normalized,
+  provider-specific metric store. Passing, shooting, creation, defensive,
+  possession, playing-time, misc, and goalkeeper exports are supported.
+- Repository and player-merge access to FBref metrics, always prefixed with
+  `fbref_` to preserve source semantics.
+- Understat `xGChain` and `xGBuildup` are retained in the player-season store
+  and surfaced in historical player data.
+
+### Fixed
+
+- Database builds now derive the default roster filename from the requested
+  season instead of hard-coding the 2026/27 file.
+- Roster ingestion normalizes status capitalization/whitespace and avoids
+  persisting pandas missing values as player roles.
+- Manual FBref imports resolve a unique season-and-club roster match before
+  falling back to a global normalized-name match.
+- Understat ingestion no longer discards the `xGChain` and `xGBuildup` fields
+  already present in the public aggregate archive.
+
 All notable project changes are recorded here.
 
 ## [Unreleased] - 2026-08-24

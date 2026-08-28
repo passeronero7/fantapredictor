@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 from config.settings import config
 from src.db import database
-from src.db.ingestors import coaches, football_data, prices, rosters, understat, votes
+from src.db.ingestors import coaches, fbref, football_data, prices, rosters, understat, votes
 
 
 def build(
@@ -24,15 +24,20 @@ def build(
     coaches_path: str | Path | None = None,
     prices_path: str | Path | None = None,
     season: str = "2627",
+    manual_fbref_dir: str | Path | None = None,
 ) -> dict[str, int]:
     """Initialize and populate the warehouse from local source snapshots."""
     season_dir = config.get_season_dir(season)
-    roster_path = Path(roster_path or season_dir / "rosters" / "virgilio_rosters_2026_27.csv")
+    roster_path = Path(
+        roster_path or season_dir / "rosters" /
+        f"virgilio_rosters_{season_dir.name.removeprefix('season_')}.csv"
+    )
     understat_path = Path(understat_path or season_dir / "raw" / "understat_players_aggregated_2014_td.csv")
     explicit_votes_dir = votes_dir is not None
     votes_dir = Path(votes_dir or season_dir / "fantacalcio" / config.VOTES_DIR)
     matches_dir = Path(matches_dir or config.DATA_DIR / "raw" / "football-data.co.uk")
     prices_path = Path(prices_path or season_dir / "fantacalcio" / "prices.csv")
+    manual_fbref_dir = Path(manual_fbref_dir or season_dir / "manual")
 
     conn = database.get_connection(db_path)
     database.init_schema(conn)
@@ -57,6 +62,8 @@ def build(
             counts["coaches"] = coaches.load(conn, coaches_path)
         if prices_path.exists():
             counts["prices"] = prices.load(conn, prices_path, season)
+        if manual_fbref_dir.exists():
+            counts["fbref"] = fbref.load(conn, manual_fbref_dir, season)
         conn.commit()
         return counts
     finally:
@@ -73,6 +80,7 @@ def main() -> None:
     parser.add_argument("--matches-dir", type=Path)
     parser.add_argument("--coaches", type=Path)
     parser.add_argument("--prices", type=Path)
+    parser.add_argument("--manual-fbref-dir", type=Path)
     args = parser.parse_args()
     counts = build(
         args.db,
@@ -83,6 +91,7 @@ def main() -> None:
         args.coaches,
         args.prices,
         args.season,
+        args.manual_fbref_dir,
     )
     for name, count in counts.items():
         print(f"{name}: {count}")

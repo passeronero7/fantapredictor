@@ -24,15 +24,16 @@ def load(conn, path: str | Path, season: str) -> int:
         values = frame[column].astype("string")
         if values.isna().any() or values.str.strip().eq("").any():
             raise ValueError(f"Every roster assertion must include {column}")
-    confirmed = frame["status"].astype(str).str.lower().eq("confirmed")
-    confirmed_roles = frame.loc[confirmed, "role"].astype("string")
-    if confirmed_roles.isna().any() or confirmed_roles.str.strip().eq("").any():
-        raise ValueError("Every confirmed roster assertion must include role")
-    invalid_statuses = set(frame["status"].dropna().astype(str)) - {
+    frame["status"] = frame["status"].astype(str).str.strip().str.lower()
+    invalid_statuses = set(frame["status"].dropna()) - {
         "confirmed", "watchlist", "excluded"
     }
     if invalid_statuses:
         raise ValueError(f"Roster contains invalid statuses: {', '.join(sorted(invalid_statuses))}")
+    confirmed = frame["status"].eq("confirmed")
+    confirmed_roles = frame.loc[confirmed, "role"].astype("string")
+    if confirmed_roles.isna().any() or confirmed_roles.str.strip().eq("").any():
+        raise ValueError("Every confirmed roster assertion must include role")
     run_id, _ = start_run(conn, "virgilio")
     label = season_label(season)
     season_id = _season_id(conn, label)
@@ -44,7 +45,9 @@ def load(conn, path: str | Path, season: str) -> int:
             if not name or not club:
                 continue
             cid = club_id(conn, club, "virgilio")
-            pid = player_id(conn, name, "virgilio", role=row.get("role") or None)
+            role = row.get("role")
+            role = None if pd.isna(role) or not str(role).strip() else str(role).strip()
+            pid = player_id(conn, name, "virgilio", role=role)
             status = row["status"]
             conn.execute(
                 """INSERT INTO roster_memberships
@@ -54,7 +57,7 @@ def load(conn, path: str | Path, season: str) -> int:
                    DO UPDATE SET role=excluded.role, status=excluded.status,
                      source_url=excluded.source_url,
                      checked_at=excluded.checked_at""",
-                (pid, cid, season_id, row.get("role") or None, status,
+                (pid, cid, season_id, role, status,
                  row.get("source_url"), row.get("checked_at")),
             )
             loaded += 1

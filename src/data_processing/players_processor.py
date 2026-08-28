@@ -27,6 +27,7 @@ class PlayersProcessor:
         roster_df: Optional[pd.DataFrame] = None,
         history_df: Optional[pd.DataFrame] = None,
         votes_df: Optional[pd.DataFrame] = None,
+        skill_stats_df: Optional[pd.DataFrame] = None,
     ) -> pd.DataFrame:
         """Merge roster, historical event data (xG/xA), and in-season votes into unified records."""
         # 1. Load active roster and history from SQLite when available.
@@ -38,6 +39,8 @@ class PlayersProcessor:
                 roster_df = repository.load_rosters(conn, self.season)
                 if history_df is None:
                     history_df = repository.load_player_history(conn)
+                if skill_stats_df is None:
+                    skill_stats_df = repository.load_player_skill_stats(conn, self.season)
             finally:
                 conn.close()
         if roster_df is None or roster_df.empty:
@@ -81,9 +84,13 @@ class PlayersProcessor:
                 player_col = "player" if "player" in history_df.columns else "player_name"
                 history_df["player_normalized"] = history_df[player_col].map(normalize_name)
 
-            for col in ["time", "xG", "xA", "npxG", "shots", "key_passes", "goals", "assists"]:
-                if col in history_df.columns:
-                    history_df[col] = pd.to_numeric(history_df[col], errors="coerce").fillna(0.0)
+            for col in [
+                "time", "xG", "xA", "npxG", "xGChain", "xGBuildup", "shots",
+                "key_passes", "goals", "assists",
+            ]:
+                if col not in history_df.columns:
+                    history_df[col] = 0.0
+                history_df[col] = pd.to_numeric(history_df[col], errors="coerce").fillna(0.0)
 
             hist_agg = history_df.groupby("player_normalized").agg(
                 hist_games=("games", "sum") if "games" in history_df.columns else ("year", "size"),
@@ -91,6 +98,8 @@ class PlayersProcessor:
                 hist_xg=("xG", "sum"),
                 hist_xa=("xA", "sum"),
                 hist_npxg=("npxG", "sum"),
+                hist_xg_chain=("xGChain", "sum"),
+                hist_xg_buildup=("xGBuildup", "sum"),
                 hist_goals=("goals", "sum"),
                 hist_assists=("assists", "sum"),
                 latest_year=("year", "max"),
@@ -141,6 +150,8 @@ class PlayersProcessor:
             merged = merged.merge(hist_agg, on="player_normalized", how="left")
         if not votes_agg.empty:
             merged = merged.merge(votes_agg, on="player_normalized", how="left")
+        if skill_stats_df is not None and not skill_stats_df.empty:
+            merged = merged.merge(skill_stats_df, on="player_normalized", how="left")
 
         # Clean team and position representations
         if "club_2026_27" in merged.columns:

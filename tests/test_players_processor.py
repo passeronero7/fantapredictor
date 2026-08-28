@@ -45,6 +45,18 @@ class PlayersProcessorTests(unittest.TestCase):
 
         self.assertEqual(result["player_normalized"].tolist(), ["confirmed"])
 
+    def test_merge_includes_provider_prefixed_manual_skill_metrics(self):
+        roster = pd.DataFrame([
+            {"player": "Player", "player_normalized": "player", "status": "confirmed"},
+        ])
+        skills = pd.DataFrame([
+            {"player_normalized": "player", "fbref_passing_progressive_passes": 15.0},
+        ])
+        result = PlayersProcessor(season="2627").merge_all_sources(
+            roster_df=roster, history_df=pd.DataFrame(), skill_stats_df=skills
+        )
+        self.assertEqual(result.loc[0, "fbref_passing_progressive_passes"], 15.0)
+
     def test_match_builder_rejects_missing_observed_targets(self):
         players = pd.DataFrame([{"player": "Player", "role": "D"}])
         with self.assertRaises(ValueError):

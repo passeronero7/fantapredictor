@@ -64,8 +64,8 @@ DEFAULT_SOURCES = [
         "name": "FBref",
         "homepage_url": "https://fbref.com",
         "licence": "See FBref ToS. Do not scrape; use manual browser export only.",
-        "notes": ("Import of manually exported FBref CSVs. Not automated because "
-                  "FBref blocks requests."),
+        "notes": ("Import of manually exported FBref CSVs into provider-specific "
+                  "player metrics. Not automated because FBref blocks requests."),
     },
 ]
 
@@ -123,6 +123,12 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
     }
     if "role" not in roster_columns:
         conn.execute("ALTER TABLE roster_memberships ADD COLUMN role TEXT")
+    player_stats_columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(player_season_stats)")
+    }
+    for column in ("xg_chain", "xg_buildup"):
+        if column not in player_stats_columns:
+            conn.execute(f"ALTER TABLE player_season_stats ADD COLUMN {column} REAL")
 
 
 def _seed_sources(conn: sqlite3.Connection) -> None:

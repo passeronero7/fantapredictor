@@ -286,6 +286,8 @@ CREATE TABLE IF NOT EXISTS player_season_stats (
     xa               REAL,
     npxg             REAL,
     xg_plus_xa       REAL,
+    xg_chain         REAL,                        -- Understat xGChain
+    xg_buildup       REAL,                        -- Understat xGBuildup
     shots            INTEGER,
     shots_on_target  INTEGER,
     key_passes       INTEGER,
@@ -301,6 +303,31 @@ CREATE TABLE IF NOT EXISTS player_season_stats (
 );
 CREATE INDEX IF NOT EXISTS ix_pss_player ON player_season_stats (player_id);
 CREATE INDEX IF NOT EXISTS ix_pss_season_club ON player_season_stats (season_id, club_id);
+
+-- Fine-grained source metrics that do not fit the stable, cross-provider
+-- player_season_stats columns above. This preserves every numeric field from a
+-- manually exported FBref table (progressive actions, shot creation,
+-- goalkeeper distribution, and so on) without pretending that provider
+-- definitions are interchangeable. `category` and `metric` are normalized
+-- identifiers; `source_file` lets an analyst trace a value to one local export.
+CREATE TABLE IF NOT EXISTS player_season_stat_values (
+    id               INTEGER PRIMARY KEY,
+    player_id        INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    club_id          INTEGER NOT NULL REFERENCES clubs(id),
+    season_id        INTEGER NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
+    category         TEXT NOT NULL,
+    metric           TEXT NOT NULL,
+    metric_label     TEXT NOT NULL,              -- original provider column header
+    value            REAL NOT NULL,
+    source_id        INTEGER NOT NULL REFERENCES sources(id),
+    source_file      TEXT NOT NULL,
+    updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (player_id, club_id, season_id, category, metric, source_id, source_file)
+);
+CREATE INDEX IF NOT EXISTS ix_player_stat_values_player_season
+    ON player_season_stat_values (player_id, season_id);
+CREATE INDEX IF NOT EXISTS ix_player_stat_values_category_metric
+    ON player_season_stat_values (category, metric);
 
 -- Coach performance per season (club + final position info)
 CREATE TABLE IF NOT EXISTS coach_season_stats (

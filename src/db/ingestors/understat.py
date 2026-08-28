@@ -39,6 +39,8 @@ def load(conn, path: str | Path, league: str = "Serie_A") -> int:
                 "xa": row.get("xA"),
                 "npxg": row.get("npxG"),
                 "xg_plus_xa": (row.get("xG", 0) or 0) + (row.get("xA", 0) or 0),
+                "xg_chain": row.get("xGChain"),
+                "xg_buildup": row.get("xGBuildup"),
                 "shots": row.get("shots"),
                 "key_passes": row.get("key_passes"),
                 "yellow_cards": row.get("yellow_cards"),
@@ -47,13 +49,15 @@ def load(conn, path: str | Path, league: str = "Serie_A") -> int:
             conn.execute(
                 """INSERT INTO player_season_stats
                    (player_id, club_id, season_id, games, minutes, goals, assists,
-                    goals_pens, xg, xa, npxg, xg_plus_xa, shots, key_passes,
-                    yellow_cards, red_cards, source_id, source_ref)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    goals_pens, xg, xa, npxg, xg_plus_xa, xg_chain, xg_buildup,
+                    shots, key_passes, yellow_cards, red_cards, source_id, source_ref)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(player_id, season_id, club_id, source_id, source_ref)
                    DO UPDATE SET games=excluded.games, minutes=excluded.minutes,
                      goals=excluded.goals, assists=excluded.assists, xg=excluded.xg,
-                     xa=excluded.xa, npxg=excluded.npxg, updated_at=datetime('now')""",
+                     xa=excluded.xa, npxg=excluded.npxg,
+                     xg_chain=excluded.xg_chain, xg_buildup=excluded.xg_buildup,
+                     updated_at=datetime('now')""",
                 (pid, cid, season_id, *[values[key] for key in values], sid, str(row.get("id", ""))),
             )
             loaded += 1

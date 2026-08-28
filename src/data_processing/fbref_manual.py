@@ -14,7 +14,17 @@ import pandas as pd
 
 EXPORTS = {
     "scouting": "fbref_scouting_{season}.csv",
+    "standard": "fbref_standard_{season}.csv",
+    "shooting": "fbref_shooting_{season}.csv",
     "passing": "fbref_passing_{season}.csv",
+    "pass_types": "fbref_pass_types_{season}.csv",
+    "goal_shot_creation": "fbref_goal_shot_creation_{season}.csv",
+    "defense": "fbref_defense_{season}.csv",
+    "possession": "fbref_possession_{season}.csv",
+    "playing_time": "fbref_playing_time_{season}.csv",
+    "misc": "fbref_misc_{season}.csv",
+    "keeper": "fbref_keeper_{season}.csv",
+    "advanced_keeper": "fbref_advanced_keeper_{season}.csv",
 }
 
 
