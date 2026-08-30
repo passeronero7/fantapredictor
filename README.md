@@ -40,6 +40,7 @@ python -m unittest discover -s tests -v
 python scripts/download_historical_votes.py --season 2024-25 --start 1 --end 38
 python scripts/download_current_prices.py --season 2026-27
 python scripts/download_match_results.py --start-year 1993 --end-year 2025
+python scripts/download_understat_data.py --season 2627
 python scripts/build_database.py --db data/fantapredictor.db --season 2627
 python scripts/inspect_database.py --db data/fantapredictor.db summary
 
@@ -75,6 +76,16 @@ FANTAPREDICTOR_DATA_DIR=/path/to/fantapredictor-workspace/data \
 ```
 
 This creates an ignored local snapshot in `data/season_2026_27/`: a 20-club player list, raw Understat archive, matched historical player-season rows, and a coverage report. The roster records are `watchlist` until each player is manually reconciled against official registration/transfer evidence and the fantasy role list; they are not eligible for modelling or auction outputs until promoted to `confirmed`.
+
+## Live Understat snapshot
+
+To retrieve a current Serie A player-season snapshot through `soccerdata`, run
+`python scripts/download_understat_data.py --season 2627`. It writes an
+ingestor-compatible CSV and a provenance manifest under
+`data/season_2026_27/raw/soccerdata/`. Pass that CSV explicitly to
+`scripts/build_database.py --understat <path>` when it should replace the
+aggregate archive for a warehouse build. Refreshing an existing snapshot
+requires `--overwrite`.
 
 ## Player confidence baseline
 

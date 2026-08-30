@@ -60,6 +60,22 @@ Promote only manually reconciled records to `confirmed`, keeping unresolved
 players as `watchlist` or `excluded`. Downstream player processing fails closed
 and admits confirmed records only.
 
+For a current player-season feature snapshot, the `soccerdata` Understat
+adapter exports the same column contract used by the existing Understat
+warehouse ingestor, together with a source URL and retrieval-time manifest:
+
+```bash
+python scripts/download_understat_data.py --season 2627
+python scripts/build_database.py --season 2627 \
+  --understat data/season_2026_27/raw/soccerdata/understat_soccerdata_player_season_2627.csv
+```
+
+The adapter does not establish squad eligibility, fantasy role, or votes. It is
+therefore a feature source only; use official/Fantacalcio data for those
+contracts. The client cache remains next to the snapshot and may be discarded
+with the ignored raw data. A repeat fetch refuses to overwrite data unless
+`--overwrite` is supplied.
+
 ## Build the Warehouse
 
 ```bash
