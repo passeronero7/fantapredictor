@@ -14,6 +14,8 @@
   five-match team/opponent xG, xG-against and points form from prior fixtures.
 - Evaluation supports disjoint expanding walk-forward windows and reports
   aggregate, per-window, role, club, and historical-minute metrics.
+- Operational documentation records the post-closure 2026/27 transfer,
+  quotation, vote, match, xG, and warehouse checkpoint.
 
 ### Fixed
 

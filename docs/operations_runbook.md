@@ -23,9 +23,9 @@ Allowed statuses are `confirmed`, `watchlist`, and `excluded`. Keep a player as
 `watchlist` until both club membership and fantasy role are evidenced. The
 public starter template is `config/roster_reconciliation.example.csv`.
 
-The official feed was refreshed at 15:01 CEST on 1 September. Because the
-transfer market closes at 20:00 CEST, repeat the same reconciliation after
-closure. The active population uses Venezia and excludes relegated Verona.
+The official feed was refreshed after closure at 21:32 CEST on 1 September.
+Repeat the reconciliation for any official correction and after the winter
+window. The active population uses Venezia and excludes relegated Verona.
 
 ## Rebuild And Inspect SQLite
 
@@ -53,10 +53,11 @@ $PYTHON fantapredictor_core/scripts/inspect_database.py \
   "PRAGMA foreign_key_check"
 ```
 
-The 1 September rebuild reported schema/ingestion version `0.6.0`, integrity `ok`, 849 roster
-rows, 11,746 matches, 124,760 player-match ratings, 7,096 player-season rows,
-and 571 prices. The active season contributes 20 completed matches, 638
-official player-match ratings, and 370 Understat player-season rows.
+The post-closure 1 September rebuild reported schema/ingestion version `0.6.0`,
+integrity `ok`, zero foreign-key errors, 861 roster rows, 11,746 matches,
+124,760 player-match ratings, 7,096 player-season rows, and 587 prices. All
+matches carry a matchday. The active season contributes 20 completed matches,
+638 official player-match ratings, and 370 Understat player-season rows.
 
 ## Release Gate
 
@@ -67,18 +68,18 @@ $PYTHON fantapredictor_core/scripts/validate_release.py \
   --require-lineup
 ```
 
-This gate must pass before prediction or auction output. The 15:01 CEST
-snapshot passes with 30 goalkeepers, 84 defenders, 81 midfielders, and 81
-forwards confirmed, but it must be repeated after the market closes.
+This roster gate must pass before prediction or auction output. The 21:32 CEST
+snapshot passes with 31 goalkeepers, 88 defenders, 83 midfielders, and 86
+forwards confirmed. Model approval is a separate gate and currently fails.
 
 ## Evaluate
 
 ```bash
 $PYTHON fantapredictor_core/scripts/evaluate_model.py \
   --season 2024-25 \
-  --cutoff-matchday 20 \
+  --cutoffs 10,20,30 \
   --epochs 25 \
-  --output data/season_2024_25/reports/model_evaluation.json
+  --output data/season_2024_25/reports/model_walk_forward_evaluation.json
 ```
 
 Read `docs/evaluation_results.md` before accepting a model. The model currently
@@ -86,14 +87,14 @@ loses to both the global-median and expanding-prior baselines.
 
 ## Predict And Optimize
 
-Once the post-closure refresh and release gate pass, run:
+For research-only output after training a model, run:
 
 ```bash
 $PYTHON fantapredictor_core/scripts/run_pipeline.py \
-  --stage predict --season 2627 --matchday 1
+  --stage predict --season 2627 --matchday 3
 
 $PYTHON fantapredictor_core/scripts/optimize_lineup.py \
-  --season 2627 --matchday 1 \
+  --season 2627 --matchday 3 \
   --strategy expected_value --formation 3-4-3
 ```
 

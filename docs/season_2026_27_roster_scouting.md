@@ -1,6 +1,6 @@
 # Serie A 2026/27 roster scouting brief
 
-**Snapshot:** 1 September 2026 at 15:01 CEST. **Status:** reconciled from the official transfer feed, but provisional until the Italian summer window closes at 20:00 CEST.
+**Snapshot:** 1 September 2026 at 21:32 CEST. **Status:** reconciled from the official transfer feed after the Italian summer window closed at 20:00 CEST.
 
 ## Competition population
 
@@ -71,16 +71,17 @@ The third-party trackers are useful for discovery; club announcements and the fi
 
 ## Latest Reconciliation Checkpoint
 
-Checked against the Lega Serie A Calciomercato feed at 15:01 CEST on 1
-September. The private roster contains 276 `confirmed`, 560 `watchlist`, and
-13 `excluded` rows. The confirmed pool contains 30 goalkeepers, 84 defenders,
-81 midfielders, and 81 forwards and passes the legal `3-4-3` release gate.
-Eighteen unique incoming registrations were added since the 28 August
-checkpoint; three lack an official mapped P/D/C/A role and remain watchlist.
+Checked against the Lega Serie A Calciomercato feed at 21:32 CEST on 1
+September. The private roster contains 288 `confirmed`, 558 `watchlist`, and
+15 `excluded` rows. The confirmed pool contains 31 goalkeepers, 88 defenders,
+83 midfielders, and 86 forwards and passes the legal `3-4-3` release gate.
+The post-closure feed added 12 destination memberships relative to the 15:01
+snapshot and applied 15 prior-club exclusions. Three official feed entries lack
+a mapped P/D/C/A role and remain watchlist.
 
 ## Market-closure decision
 
-The 15:01 CEST checkpoint is not the definitive closure snapshot. Refresh the
-official feed and Fantacalcio player/role list after 20:00 CEST before treating
-the roster as final. The active club population includes Venezia and excludes
-relegated Verona.
+The 21:32 CEST checkpoint is the post-closure summer snapshot. Retain its
+per-row source URL and UTC `checked_at` value, and refresh for any official
+correction or the winter window. The active club population includes Venezia
+and excludes relegated Verona.

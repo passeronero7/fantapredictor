@@ -16,15 +16,20 @@ The codebase implements:
 - Offline source ingestors and a reproducible SQLite builder (`scripts/build_database.py`).
 
 The current release is not yet an auction-ready prediction release. The active
-2026/27 snapshot checked at 15:01 CEST on 1 September contains 276 confirmed,
-560 watchlist, and 13 excluded memberships and passes the legal default 3-4-3
-roster gate. It remains a pre-deadline snapshot until the 20:00 CEST market
-closure. The SHASH model is implemented and evaluated, but the 2024/25 holdout
-currently shows the expanding-prior and global-median baselines outperforming
-it. See the [evaluation record](docs/evaluation_results.md) and
+post-deadline 2026/27 snapshot checked at 21:32 CEST on 1 September contains
+288 confirmed, 558 watchlist, and 15 excluded memberships and passes the legal
+default 3-4-3 roster gate. The SHASH model is implemented and evaluated, but
+the leakage-safe 2024/25 walk-forward study still shows the expanding-prior and
+global-median baselines outperforming it. See the
+[evaluation record](docs/evaluation_results.md) and
 [operations runbook](docs/operations_runbook.md).
 
-The 2026/27 roster research is a live dataset, not a frozen truth: the summer market closes on 1 September 2026 at 20:00 Italian time (20:00 CEST). The current competition population includes Venezia and excludes relegated Verona. See the [scouting brief](docs/season_2026_27_roster_scouting.md) for the roster policy, club population, sources, and first confirmed-transfer reconciliation queue.
+The 2026/27 roster research remains a live dataset rather than frozen truth;
+the summer-market closure snapshot was taken after 20:00 CEST on 1 September
+2026 and should still be refreshed for official corrections and the winter
+window. The current competition population includes Venezia and excludes
+relegated Verona. See the [scouting brief](docs/season_2026_27_roster_scouting.md)
+for the roster policy, club population, and source hierarchy.
 
 ## Setup
 
