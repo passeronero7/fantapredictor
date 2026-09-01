@@ -1,6 +1,6 @@
 # Free data sources for Fantacalcio 2026/27
 
-**Assessed:** 23 August 2026. “Free” does not mean unrestricted reuse: retain source attribution, obey each site’s terms, and rate-limit all requests.
+**Assessed:** 1 September 2026. “Free” does not mean unrestricted reuse: retain source attribution, obey each site’s terms, and rate-limit all requests.
 
 ## Recommended source stack
 
@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | Fixtures, results, standings, official player/team rankings | [Lega Serie A statistics](https://www.legaseriea.it/serie-a/statistiche/index) | HTTP 200 | Authoritative reconciliation source. Capture published tables or match reports; no documented public bulk API was identified. |
 | Player, team, match, and shot-level xG data | [Understat](https://understat.com/league/Serie_A/2026) via [understatAPI](https://collinb9.github.io/understatAPI/) or `soccerdata` | HTTP 200 | Preferred automated analytical source. Covers Serie A from 2014/15; use the 2026 season identifier for 2026/27. |
-| Historical and in-season match results, basic match stats, and odds | [Football-Data.co.uk Italy downloads](https://www.football-data.co.uk/italym.php) | Index available; direct `2627/I1.csv` returned HTTP 300 on 23 Aug | Good free historical baseline. Retry after the publisher creates the 2026/27 file; normal pattern is `mmz4281/{season}/I1.csv`. |
+| Historical and in-season match results, basic match stats, and odds | [Football-Data.co.uk Italy downloads](https://www.football-data.co.uk/italym.php) | Historical files available; direct `2627/I1.csv` returned HTTP 502 on 1 Sep | Good free historical baseline. Use the timestamped Understat match snapshot until the publisher creates a stable 2026/27 file. |
 | Fixtures, tables, clubs, and top scorers | [football-data.org](https://www.football-data.org/documentation/quickstart) | HTTP 403 without an API token | Use only after registering for its free token/plan; it is a useful structured fixture fallback, not a complete Fantacalcio player-stat feed. |
 | Fantasy prices, roles, votes, and probable line-ups | [Fantacalcio.it official archive](https://www.fantacalcio.it/voti-fantacalcio-serie-a) and [quotations](https://www.fantacalcio.it/quotazioni-fantacalcio) | HTTP 200 | Public HTML retrieval supports official matchday tables across 11 seasons (2015/16 through 2025/26), plus current classic/mantra roles, prices, and FVM. |
 | Squad and transfer confirmation | Official club announcements + Lega Serie A | Public web pages | Use for roster truth. Do not populate confirmed roster records from rumours or undocumented APIs. |
@@ -33,7 +33,7 @@
 | `https://fbref.com/en/comps/11/2026-27/stats/Serie-A-Stats` | Manual browser export only | Do not automate access or attempt to bypass access controls. |
 | `https://understat.com/league/Serie_A/2026` | HTTP 200 | Reachable candidate for programmatic analytical data. |
 | `https://www.legaseriea.it/serie-a/statistiche/index` | HTTP 200 | Reachable official reconciliation source. |
-| `https://www.football-data.co.uk/mmz4281/2627/I1.csv` | HTTP 300 | Current-season CSV is not yet usable at that expected location. |
+| `https://www.football-data.co.uk/mmz4281/2627/I1.csv` | HTTP 502 | Current-season CSV was still unavailable on 1 September. |
 | `https://api.football-data.org/v4/competitions/SA/matches?season=2026` | HTTP 403 | Requires registration/token. |
 
 ## Data-model implications

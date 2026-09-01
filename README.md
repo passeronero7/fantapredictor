@@ -15,12 +15,14 @@ The codebase implements:
 - Monte Carlo lineup optimizer with formation constraints and Serie A *Modificatore Difesa* bonus calculations (`src/models/lineup_optimizer.py`).
 - Offline source ingestors and a reproducible SQLite builder (`scripts/build_database.py`).
 
-The current release is not an auction-ready prediction release. The active
-2026/27 snapshot contains 4 confirmed players and 622 watchlist players, so it
-cannot form a legal default 3-4-3 squad. The SHASH model is implemented and
-evaluated, but the 2024/25 holdout currently shows the expanding-prior and
-global-median baselines outperforming it. See the [evaluation record](docs/evaluation_results.md)
-and [operations runbook](docs/operations_runbook.md).
+The current release is not yet an auction-ready prediction release. The active
+2026/27 snapshot checked at 15:01 CEST on 1 September contains 276 confirmed,
+560 watchlist, and 13 excluded memberships and passes the legal default 3-4-3
+roster gate. It remains a pre-deadline snapshot until the 20:00 CEST market
+closure. The SHASH model is implemented and evaluated, but the 2024/25 holdout
+currently shows the expanding-prior and global-median baselines outperforming
+it. See the [evaluation record](docs/evaluation_results.md) and
+[operations runbook](docs/operations_runbook.md).
 
 The 2026/27 roster research is a live dataset, not a frozen truth: the summer market closes on 1 September 2026 at 20:00 Italian time (20:00 CEST). The current competition population includes Venezia and excludes relegated Verona. See the [scouting brief](docs/season_2026_27_roster_scouting.md) for the roster policy, club population, sources, and first confirmed-transfer reconciliation queue.
 
@@ -36,8 +38,9 @@ python -m unittest discover -s tests -v
 ## Available workflow
 
 ```bash
-# Download official historical matchday votes and ratings
-python scripts/download_historical_votes.py --season 2024-25 --start 1 --end 38
+# Download official matchday votes, current stats/results, and quotations
+python scripts/download_historical_votes.py --season 2026-27 --start 1 --end 2
+python scripts/download_understat_season.py --season 2026
 python scripts/download_current_prices.py --season 2026-27
 python scripts/download_match_results.py --start-year 1993 --end-year 2025
 python scripts/build_database.py --db data/fantapredictor.db --season 2627

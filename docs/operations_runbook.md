@@ -23,9 +23,9 @@ Allowed statuses are `confirmed`, `watchlist`, and `excluded`. Keep a player as
 `watchlist` until both club membership and fantasy role are evidenced. The
 public starter template is `config/roster_reconciliation.example.csv`.
 
-No further active-roster promotion is planned before the transfer market closes
-on 1 September 2026 at 20:00 Italian time (20:00 CEST). The post-closure
-refresh must use Venezia as a Serie A club and must exclude relegated Verona.
+The official feed was refreshed at 15:01 CEST on 1 September. Because the
+transfer market closes at 20:00 CEST, repeat the same reconciliation after
+closure. The active population uses Venezia and excludes relegated Verona.
 
 ## Rebuild And Inspect SQLite
 
@@ -53,9 +53,10 @@ $PYTHON fantapredictor_core/scripts/inspect_database.py \
   "PRAGMA foreign_key_check"
 ```
 
-The latest rebuild reported schema `0.4.0`, integrity `ok`, 626 roster rows,
-11,726 matches, 124,122 player-match ratings, 6,726 player-season rows, and
-539 prices.
+The 1 September rebuild reported schema/ingestion version `0.6.0`, integrity `ok`, 849 roster
+rows, 11,746 matches, 124,760 player-match ratings, 7,096 player-season rows,
+and 571 prices. The active season contributes 20 completed matches, 638
+official player-match ratings, and 370 Understat player-season rows.
 
 ## Release Gate
 
@@ -66,9 +67,9 @@ $PYTHON fantapredictor_core/scripts/validate_release.py \
   --require-lineup
 ```
 
-This gate must pass before prediction or auction output. As of the latest
-snapshot it fails because the confirmed pool contains only 3 midfielders and 1
-defender, with no confirmed goalkeeper or forwards.
+This gate must pass before prediction or auction output. The 15:01 CEST
+snapshot passes with 30 goalkeepers, 84 defenders, 81 midfielders, and 81
+forwards confirmed, but it must be repeated after the market closes.
 
 ## Evaluate
 
@@ -85,7 +86,7 @@ loses to both the global-median and expanding-prior baselines.
 
 ## Predict And Optimize
 
-These commands are intentionally blocked until the release gate passes:
+Once the post-closure refresh and release gate pass, run:
 
 ```bash
 $PYTHON fantapredictor_core/scripts/run_pipeline.py \

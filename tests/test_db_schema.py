@@ -57,6 +57,21 @@ class SchemaTests(unittest.TestCase):
         ).fetchone()[0]
         self.assertEqual(count, 1)
 
+    def test_understat_club_aliases_resolve_to_canonical_names(self):
+        from src.db.ingestors.common import club_id
+
+        milan = club_id(self.conn, "Milan", "fantacalcio")
+        self.assertEqual(club_id(self.conn, "AC Milan", "understat", "111"), milan)
+        parma = club_id(self.conn, "Parma", "fantacalcio")
+        self.assertEqual(club_id(self.conn, "Parma Calcio 1913", "understat", "112"), parma)
+
+    def test_missing_provider_player_ids_do_not_collapse_distinct_players(self):
+        from src.db.ingestors.common import player_id
+
+        first = player_id(self.conn, "First Player", "fantacalcio", float("nan"))
+        second = player_id(self.conn, "Second Player", "fantacalcio", float("nan"))
+        self.assertNotEqual(first, second)
+
     def test_get_or_create_season_is_idempotent(self):
         first = db.get_or_create_season(self.conn, "2026/27")
         second = db.get_or_create_season(self.conn, "2026/27")

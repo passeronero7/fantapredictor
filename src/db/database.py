@@ -73,6 +73,7 @@ DEFAULT_SOURCES = [
 # {alias_in_source: canonical_name}
 TEAM_ALIAS_MAP = {
     "Milan": "Milan",
+    "AC Milan": "Milan",
     "Inter": "Inter",
     "Roma": "Roma",
     "Napoli": "Napoli",
@@ -87,6 +88,7 @@ TEAM_ALIAS_MAP = {
     "Cagliari": "Cagliari",
     "Lecce": "Lecce",
     "Parma": "Parma",
+    "Parma Calcio 1913": "Parma",
     "Udinese": "Udinese",
     "Monza": "Monza",
     "Venezia": "Venezia",

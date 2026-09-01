@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import UTC, datetime
+from numbers import Integral
 from typing import Any
 
 from src.db.database import TEAM_ALIAS_MAP, get_or_create_club
@@ -26,9 +27,16 @@ def source_id(conn, slug: str) -> int:
 
 def season_label(value: str | int) -> str:
     """Convert compact or full season identifiers to ``YYYY/YY``."""
+    if isinstance(value, Integral):
+        start = int(value)
+        return f"{start}/{(start + 1) % 100:02d}"
     text = str(value).strip().replace("-", "/").replace("_", "/")
     if re.fullmatch(r"\d{4}", text):
-        start = int(text) if text[:2] in {"19", "20"} else 2000 + int(text[:2])
+        short_start, short_end = int(text[:2]), int(text[2:])
+        if short_end == (short_start + 1) % 100:
+            start = (2000 if short_start < 70 else 1900) + short_start
+        else:
+            start = int(text)
         return f"{start}/{(start + 1) % 100:02d}"
     if re.fullmatch(r"\d{2}/\d{2}", text):
         start = int(text[:2])
@@ -60,7 +68,9 @@ def integer(value: Any, default: int | None = None) -> int | None:
 
 def player_id(conn, name: str, source: str, source_ref: Any = None, role: str | None = None) -> int:
     """Create or resolve a player and retain a source-specific identity alias."""
-    source_ref_text = None if source_ref is None else str(source_ref)
+    source_ref_text = None if source_ref is None else str(source_ref).strip()
+    if source_ref_text and source_ref_text.lower() in {"nan", "none", "null", "<na>"}:
+        source_ref_text = None
     sid = source_id(conn, source)
     normalized = normalize_name(name)
     row = None

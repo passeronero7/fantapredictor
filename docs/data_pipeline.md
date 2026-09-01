@@ -29,6 +29,13 @@ Repeat for the seasons required by the experiment. The downloader writes one
 CSV per matchday plus a convenience `Full.csv`. The loader ignores `Full.csv`
 to avoid double-counting the daily files.
 
+For the first two completed 2026/27 matchdays:
+
+```bash
+python scripts/download_historical_votes.py \
+  --season 2026-27 --start 1 --end 2 --delay 0.5
+```
+
 ### Fantacalcio quotations
 
 The public quotations page supplies classic/mantra roles, initial/current price,
@@ -63,8 +70,9 @@ players as `watchlist` or `excluded`. Downstream player processing fails closed
 and admits confirmed records only.
 
 For the in-progress current season, retrieve one public Understat snapshot and
-then rebuild. The snapshot retains xG, xA, npxG, shots, key passes, xGChain,
-and xGBuildup:
+then rebuild. The player snapshot retains xG, xA, npxG, shots, key passes,
+xGChain, and xGBuildup. A companion match snapshot retains completed fixtures,
+scores, matchdays, and home/away xG:
 
 ```bash
 python scripts/download_understat_season.py --season 2026
@@ -97,9 +105,10 @@ pipeline retrieval; raw files are inputs to the builder, not model inputs.
 
 The default build scans all `data/season_*/fantacalcio/voti/` directories, so
 all downloaded historical vote seasons are loaded. It also loads the current
-Understat archive, current roster snapshot, Football-Data match files, and the
-current quotation CSV when present. If a `manual/` directory exists, it also
-imports local FBref exports. Supported filenames are:
+Understat player and completed-match snapshots, current roster snapshot,
+Football-Data match files, and the current quotation CSV when present. If a
+`manual/` directory exists, it also imports local FBref exports. Supported
+filenames are:
 
 ```text
 fbref_standard_<season>.csv           fbref_shooting_<season>.csv

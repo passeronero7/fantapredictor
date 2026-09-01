@@ -1,6 +1,6 @@
 # Serie A 2026/27 roster scouting brief
 
-**Snapshot:** 24 August 2026. **Status:** watchlist-first and incomplete until the Italian summer window closes on 1 September 2026 at 20:00 CEST.
+**Snapshot:** 1 September 2026 at 15:01 CEST. **Status:** reconciled from the official transfer feed, but provisional until the Italian summer window closes at 20:00 CEST.
 
 ## Competition population
 
@@ -71,24 +71,16 @@ The third-party trackers are useful for discovery; club announcements and the fi
 
 ## Latest Reconciliation Checkpoint
 
-Checked on 24 August 2026. Four rows have both club evidence and a fantasy
-role; all other baseline rows remain `watchlist`:
-
-| Player | Club | Role | Primary evidence |
-|---|---|---|---|
-| Alieu Fadera | Cagliari | C | [Como 1907 announcement](https://x.com/Como_1907/status/2090887713461342366) |
-| Curtis Jones | Inter | C | [Inter announcement](https://www.inter.it/en/news/curtis-jones-new-inter-player) |
-| Diego Moreira | Milan | C | [AC Milan announcement](https://www.acmilan.com/it/news/articoli/media/2026-08-19/comunicato-ufficiale-diego-moreira) |
-| Niccolò Fortini | Torino | D | [Torino announcement](https://x.com/TorinoFC_1906/status/2090733807263477882) |
-
-The private roster currently contains 4 `confirmed` and 622 `watchlist` rows.
-It cannot yet form a legal `3-4-3` lineup. Re-run the release validator after
-each manual update.
+Checked against the Lega Serie A Calciomercato feed at 15:01 CEST on 1
+September. The private roster contains 276 `confirmed`, 560 `watchlist`, and
+13 `excluded` rows. The confirmed pool contains 30 goalkeepers, 84 defenders,
+81 midfielders, and 81 forwards and passes the legal `3-4-3` release gate.
+Eighteen unique incoming registrations were added since the 28 August
+checkpoint; three lack an official mapped P/D/C/A role and remain watchlist.
 
 ## Market-closure decision
 
-The current project decision is to make no further active-roster promotions
-before the market closes on 1 September 2026 at 20:00 Italian time (20:00
-CEST). At that point, refresh the definitive Serie A population and the
-Fantacalcio player/role list before reconciling the remaining rows. The expected
-club population includes Venezia and excludes relegated Verona.
+The 15:01 CEST checkpoint is not the definitive closure snapshot. Refresh the
+official feed and Fantacalcio player/role list after 20:00 CEST before treating
+the roster as final. The active club population includes Venezia and excludes
+relegated Verona.

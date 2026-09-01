@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.download_baseline_data import parse_rosters
-from scripts.download_understat_season import build_frame
+from scripts.download_understat_season import build_frame, build_match_frame
 
 
 class RosterParsingTests(unittest.TestCase):
@@ -37,6 +37,27 @@ class UnderstatSeasonTests(unittest.TestCase):
         self.assertEqual(frame.loc[0, "year"], 2026)
         self.assertEqual(frame.loc[0, "primary_position"], "F")
         self.assertEqual(frame.loc[0, "xGBuildup"], "2.1")
+
+    def test_build_match_frame_keeps_completed_results_and_assigns_matchdays(self):
+        def match(identifier, home_id, home, away_id, away, completed=True):
+            return {
+                "id": str(identifier), "isResult": completed,
+                "h": {"id": str(home_id), "title": home},
+                "a": {"id": str(away_id), "title": away},
+                "goals": {"h": "2" if completed else None, "a": "1" if completed else None},
+                "xG": {"h": "1.5" if completed else None, "a": "0.8" if completed else None},
+                "datetime": "2026-08-22 18:45:00",
+            }
+
+        dates = [
+            match(1, 1, "A", 2, "B"), match(2, 3, "C", 4, "D"),
+            match(3, 1, "A", 3, "C"), match(4, 2, "B", 4, "D", completed=False),
+        ]
+        frame = build_match_frame(dates, 2026, "2026-09-01T12:00:00+00:00")
+
+        self.assertEqual(len(frame), 3)
+        self.assertEqual(frame["matchday"].tolist(), [1, 1, 2])
+        self.assertEqual(frame.loc[0, "home_xg"], "1.5")
 
 
 if __name__ == "__main__":

@@ -34,11 +34,13 @@ def build(
     )
     if understat_path is not None:
         understat_paths = [Path(understat_path)]
+        understat_match_paths: list[Path] = []
     else:
         raw_dir = season_dir / "raw"
         understat_paths = [raw_dir / "understat_players_aggregated_2014_td.csv"]
         understat_paths.extend(sorted(raw_dir.glob("understat_serie_a_*_season.csv")))
         understat_paths = list(dict.fromkeys(understat_paths))
+        understat_match_paths = sorted(raw_dir.glob("understat_serie_a_*_matches.csv"))
     explicit_votes_dir = votes_dir is not None
     votes_dir = Path(votes_dir or season_dir / "fantacalcio" / config.VOTES_DIR)
     matches_dir = Path(matches_dir or config.DATA_DIR / "raw" / "football-data.co.uk")
@@ -49,14 +51,21 @@ def build(
     database.init_schema(conn)
     counts: dict[str, int] = {}
     try:
+        # Load the active roster first so multi-club current-season aggregates
+        # can resolve to the officially reconciled destination club.
+        if roster_path.exists():
+            counts["rosters"] = rosters.load(conn, roster_path, season)
         understat_loaded = 0
         for path in understat_paths:
             if path.exists():
                 understat_loaded += understat.load(conn, path)
         if understat_loaded:
             counts["understat"] = understat_loaded
-        if roster_path.exists():
-            counts["rosters"] = rosters.load(conn, roster_path, season)
+        understat_matches_loaded = sum(
+            understat.load_matches(conn, path) for path in understat_match_paths
+        )
+        if understat_matches_loaded:
+            counts["understat_matches"] = understat_matches_loaded
         if explicit_votes_dir:
             if votes_dir.exists():
                 counts["votes"] = votes.load(conn, votes_dir, season)

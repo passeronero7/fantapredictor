@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.6.0] - 2026-09-01
+
+### Added
+
+- Current-season Understat downloads now retain completed fixtures, final
+  scores, matchday numbers, and team xG alongside player-season aggregates.
+- The warehouse builder ingests the Understat match snapshot when the
+  Football-Data.co.uk current-season file is unavailable.
+
+### Fixed
+
+- Missing Fantacalcio provider IDs no longer collapse every player from a club
+  into one warehouse identity.
+- Compact pre-2000 season codes such as `9394` and `9900` now resolve to
+  1993/94 and 1999/00 instead of future seasons.
+- Understat's `AC Milan` and `Parma Calcio 1913` labels resolve to canonical
+  warehouse clubs. Comma-joined transfer aggregates use an official active
+  roster destination when available and otherwise remain club-unassigned.
+
 ## [0.5.0] - 2026-08-28
 
 ### Added
