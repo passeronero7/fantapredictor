@@ -1,5 +1,35 @@
 # Changelog
 
+## [Unreleased]
+
+### Evaluated
+
+- Whether a directories refactor would clean up the codebase. **Conclusion:
+  not warranted as a broad restructure.** The project is ~60 Python files
+  split across four purpose-named `src/` packages (`db`, `data_processing`,
+  `models`, `utils`) plus flat `scripts/` (18 files) and `tests/` (23 files)
+  directories that already mirror the module they cover. Nesting `scripts/`
+  by workflow stage, or splitting `tests/` into unit/integration, would mean
+  rewriting every doc reference (`README.md`, `AGENTS.md`,
+  `docs/operations_runbook.md`, `docs/data_pipeline.md`) and the
+  cross-script imports in `run_pipeline.py`
+  (`from scripts.optimize_lineup import optimize`, `from scripts.validate_release
+  import validate_roster`) for no clear navigability gain at this size. See
+  `AGENTS.md`'s new "Layout" section for the standing rule this sets.
+
+### Removed
+
+- `src/utils/file_io.py`: dead code with zero importers anywhere in `src/`,
+  `scripts/`, or `tests/` (confirmed by a repo-wide grep before deletion).
+  Its `read_excel`/`to_excel` helpers were superseded by direct `pandas`
+  calls at each actual call site.
+
+### Changed
+
+- `README.md`'s "Project map" now describes what each `src/` package and
+  `scripts/`/`tests/`/`config/` directory is for, instead of one line per
+  top-level directory.
+
 ## [0.7.0] - 2026-09-02
 
 Implements `docs/ingestion_and_fixing_strategy.md` Strategy A/B (see that

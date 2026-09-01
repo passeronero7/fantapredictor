@@ -124,4 +124,18 @@ See the full setup and future merge guide in [`docs/repository_architecture_and_
 - `AGENTS.md` — working rules, commands, and roster data contract.
 - `CHANGELOG.md` — change history and known limitations.
 - `docs/` — time-stamped research notes, probabilistic modeling evaluation, and security architecture.
-- `src/` — modular Python package.
+- `config/` — `settings.py` (paths, hyperparameters) plus example CSV/JSON templates for private data the workspace supplies (rosters, coaches, league rules) and the declared `data_sources.json` ingestion manifest.
+- `scripts/` — one CLI entry point per file, run as `python scripts/<name>.py`: downloaders (`download_*`), the warehouse builder (`build_database.py`), the orchestrator (`run_pipeline.py`), evaluation/inspection (`evaluate_model.py`, `inspect_database.py`), and standalone analysis tools (`analyze_defenders.py`, `optimize_lineup.py`, `reconcile_official_transfers.py`, `prepare_manual_fbref.py`).
+- `src/` — modular Python package:
+  - `src/db/` — the SQLite warehouse: `database.py` (connection, schema, versioned migrations), `build.py` (manifest resolution, checksum-skip, per-source error isolation), `repository.py` (the single read path for scripts and models), `schema.sql`, and `ingestors/` (one loader per source, e.g. `votes.py`, `understat.py`, `football_data.py`).
+  - `src/data_processing/` — DataFrame-level transforms between raw exports and the warehouse or model inputs (`votes_processor.py`, `players_processor.py`, `match_data_builder.py`, `prices_processor.py`, `fbref_manual.py`, `soccerdata_understat.py`).
+  - `src/models/` — the probabilistic prediction and optimization layer (`neural_network.py`, `distributions.py`, `evaluation.py`, `confidence_model.py`, `lineup_optimizer.py`).
+  - `src/utils/` — small cross-cutting helpers (`name_matching.py`).
+- `tests/` — one file per module under test, run with `python -m unittest discover -s tests` or `pytest`.
+
+This structure was deliberately kept as-is rather than reorganized into deeper
+subpackages (e.g. grouping `scripts/` by workflow stage): with roughly 60
+Python files split across four purpose-named `src/` packages plus a flat
+`scripts/`/`tests/`, further nesting would mean updating every doc and
+cross-script import for little navigability gain. See `CHANGELOG.md`
+`[Unreleased]` for that evaluation.

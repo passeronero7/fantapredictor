@@ -4,6 +4,20 @@
 
 Build a reproducible, evidence-led Fantacalcio research and prediction project for Serie A 2026/27 (named `fantapredictor`).
 
+## Layout
+
+See `README.md`'s "Project map" for the directory breakdown. The flat
+`scripts/`/`tests/` layout and the four purpose-named `src/` packages
+(`db`, `data_processing`, `models`, `utils`) were deliberately kept as-is
+after an explicit evaluation (`CHANGELOG.md`) concluded that deeper
+subpackaging would mean rewriting every doc and cross-script import
+(`run_pipeline.py` imports `scripts.optimize_lineup` and
+`scripts.validate_release` directly) for little real navigability gain at
+this project's size (~60 Python files). Don't introduce new subdirectories
+under `scripts/` or `tests/` without a concrete reason beyond tidiness; do
+delete a module once nothing imports it (verify with a repo-wide grep first,
+as was done for the unused `src/utils/file_io.py`).
+
 ## Working rules
 
 - Keep `README.md` and `CHANGELOG.md` authoritative.
