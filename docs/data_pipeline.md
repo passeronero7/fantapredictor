@@ -185,6 +185,12 @@ expanding prior-only aggregates, preventing the target matchday from leaking
 into its own features. Missing fixture context is represented explicitly as
 `context_available=0`; it is never silently converted to `is_home=1`.
 
+Fixture context is built as one row per team and match. Home/away and opponent
+identity come from the target fixture; xG-for, xG-against and points form are
+five-match rolling means shifted by one fixture. Opponent form is joined only
+after that shift. Football-Data seasons without an explicit matchday field use
+the provider's fixture order and detected club count to assign rounds.
+
 `FantacalcioPredictor` is a TensorFlow deep network with a direct SHASH negative
 log-likelihood. It persists both Keras models and scaler metadata. A model must
 be trained on observed `target_vote` and `target_fantavoto` values before it can

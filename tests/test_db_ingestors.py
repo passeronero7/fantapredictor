@@ -91,6 +91,7 @@ class DatabaseIngestorTests(unittest.TestCase):
             connection = sqlite3.connect(db_path)
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM player_match_ratings").fetchone()[0], 1)
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM matches").fetchone()[0], 1)
+            self.assertEqual(connection.execute("SELECT matchday FROM matches").fetchone()[0], 1)
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM player_season_stats").fetchone()[0], 1)
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM match_odds").fetchone()[0], 1)
             self.assertEqual(

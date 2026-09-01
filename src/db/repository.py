@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import sqlite3
 
+import numpy as np
 import pandas as pd
 
 from src.db.ingestors.common import season_label
+from src.utils.name_matching import normalize_team_name
 
 
 def load_rosters(conn: sqlite3.Connection, season: str) -> pd.DataFrame:
@@ -161,3 +163,118 @@ def load_player_skill_stats(conn: sqlite3.Connection, season: str) -> pd.DataFra
         for column in wide.columns
     ]
     return wide
+
+
+def load_match_context(
+    conn: sqlite3.Connection,
+    through_season: str | int | None = None,
+    window: int = 5,
+) -> pd.DataFrame:
+    """Return fixture and rolling prior form for each team-match row.
+
+    The fixture identity and home/away flag are known pre-match. Result, xG and
+    points values are shifted before rolling, so the target fixture never
+    contributes to its own features.
+    """
+    if window < 1:
+        raise ValueError("Rolling match-context window must be positive")
+    where = "WHERE m.matchday IS NOT NULL"
+    params: tuple[object, ...] = ()
+    if through_season is not None:
+        cutoff_year = int(season_label(through_season).split("/", 1)[0])
+        where += " AND s.start_year <= ?"
+        params = (cutoff_year,)
+    matches = pd.read_sql_query(
+        f"""
+        SELECT m.id AS match_id, s.name AS season, s.start_year,
+               m.matchday, m.match_date, home.name AS home_team,
+               away.name AS away_team, m.home_goals, m.away_goals,
+               m.home_xg, m.away_xg, src.slug AS source
+        FROM matches AS m
+        JOIN seasons AS s ON s.id = m.season_id
+        JOIN clubs AS home ON home.id = m.home_club_id
+        JOIN clubs AS away ON away.id = m.away_club_id
+        LEFT JOIN sources AS src ON src.id = m.source_id
+        {where}
+        ORDER BY s.start_year, m.match_date, m.id
+        """,
+        conn,
+        params=params,
+    )
+    output_columns = [
+        "season", "matchday", "team", "team_normalized", "opponent",
+        "opponent_normalized", "is_home", "context_available",
+        "team_xg_for_last5", "team_xg_against_last5", "team_points_last5",
+        "opponent_xg_for_last5", "opponent_xg_against_last5",
+        "opponent_points_last5",
+    ]
+    if matches.empty:
+        return pd.DataFrame(columns=output_columns)
+
+    # Prefer the richest row if two providers describe the same fixture.
+    matches["xg_available"] = matches[["home_xg", "away_xg"]].notna().sum(axis=1)
+    matches["source_priority"] = matches["source"].eq("understat").astype(int)
+    matches = matches.sort_values(
+        ["season", "matchday", "home_team", "away_team", "xg_available", "source_priority"],
+        ascending=[True, True, True, True, False, False],
+    ).drop_duplicates(["season", "matchday", "home_team", "away_team"], keep="first")
+
+    home = pd.DataFrame({
+        "match_id": matches["match_id"], "season": matches["season"],
+        "start_year": matches["start_year"], "matchday": matches["matchday"],
+        "match_date": matches["match_date"], "team": matches["home_team"],
+        "opponent": matches["away_team"], "is_home": 1.0,
+        "xg_for": matches["home_xg"], "xg_against": matches["away_xg"],
+        "goals_for": matches["home_goals"], "goals_against": matches["away_goals"],
+    })
+    away = pd.DataFrame({
+        "match_id": matches["match_id"], "season": matches["season"],
+        "start_year": matches["start_year"], "matchday": matches["matchday"],
+        "match_date": matches["match_date"], "team": matches["away_team"],
+        "opponent": matches["home_team"], "is_home": 0.0,
+        "xg_for": matches["away_xg"], "xg_against": matches["home_xg"],
+        "goals_for": matches["away_goals"], "goals_against": matches["home_goals"],
+    })
+    context = pd.concat([home, away], ignore_index=True)
+    context["team_normalized"] = context["team"].map(normalize_team_name)
+    context["opponent_normalized"] = context["opponent"].map(normalize_team_name)
+    goals_for = pd.to_numeric(context["goals_for"], errors="coerce")
+    goals_against = pd.to_numeric(context["goals_against"], errors="coerce")
+    context["points"] = np.select(
+        [goals_for > goals_against, goals_for == goals_against],
+        [3.0, 1.0],
+        default=0.0,
+    )
+    context.loc[goals_for.isna() | goals_against.isna(), "points"] = np.nan
+    context = context.sort_values(
+        ["start_year", "team_normalized", "match_date", "matchday", "match_id"]
+    ).reset_index(drop=True)
+
+    groups = context.groupby(["season", "team_normalized"], sort=False)
+    for source_column, feature_column in (
+        ("xg_for", "team_xg_for_last5"),
+        ("xg_against", "team_xg_against_last5"),
+        ("points", "team_points_last5"),
+    ):
+        context[feature_column] = groups[source_column].transform(
+            lambda values: values.shift(1).rolling(window, min_periods=1).mean()
+        )
+
+    opponent_form = context[
+        [
+            "match_id", "team_normalized", "team_xg_for_last5",
+            "team_xg_against_last5", "team_points_last5",
+        ]
+    ].rename(columns={
+        "team_normalized": "opponent_normalized",
+        "team_xg_for_last5": "opponent_xg_for_last5",
+        "team_xg_against_last5": "opponent_xg_against_last5",
+        "team_points_last5": "opponent_points_last5",
+    })
+    context = context.merge(
+        opponent_form, on=["match_id", "opponent_normalized"], how="left"
+    )
+    context["context_available"] = 1
+    return context[output_columns].sort_values(
+        ["season", "matchday", "team_normalized"]
+    ).reset_index(drop=True)

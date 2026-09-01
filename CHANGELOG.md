@@ -10,6 +10,8 @@
   Football-Data.co.uk current-season file is unavailable.
 - Historical training now loads every observed vote season through the target
   season and creates season-specific player snapshots.
+- Match feature matrices now include home/away, opponent identity and rolling
+  five-match team/opponent xG, xG-against and points form from prior fixtures.
 
 ### Fixed
 
@@ -17,6 +19,8 @@
   target season, preventing future and same-season feature leakage.
 - The pipeline's `--include-history` flag now changes the training population
   instead of being accepted without effect.
+- Football-Data match ingestion assigns round numbers from fixture order when
+  the provider file has no matchday field, enabling historical context joins.
 - Missing Fantacalcio provider IDs no longer collapse every player from a club
   into one warehouse identity.
 - Compact pre-2000 season codes such as `9394` and `9900` now resolve to

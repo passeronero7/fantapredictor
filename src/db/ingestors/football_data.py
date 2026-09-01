@@ -44,39 +44,66 @@ def _load_file(conn, path: Path, season_code: str) -> int:
     sid = source_id(conn, "football-data.co.uk")
     loaded = 0
     with path.open("r", encoding="latin-1", newline="") as handle:
-        reader = csv.DictReader(handle)
-        for row in reader:
-            home = (row.get("HomeTeam") or "").strip()
-            away = (row.get("AwayTeam") or "").strip()
-            raw_date = (row.get("Date") or "").strip()
-            if not home or not away or not raw_date:
-                continue
-            match_date = _date(raw_date)
-            source_ref = source_match_ref(season_code, match_date, home, away)
-            home_id = club_id(conn, home, "football-data.co.uk")
-            away_id = club_id(conn, away, "football-data.co.uk")
-            conn.execute(
-                """INSERT INTO matches
-                   (season_id, match_date, home_club_id, away_club_id,
+        rows = [
+            row
+            for row in csv.DictReader(handle)
+            if (row.get("HomeTeam") or "").strip()
+            and (row.get("AwayTeam") or "").strip()
+            and (row.get("Date") or "").strip()
+        ]
+    clubs = {
+        (row.get(column) or "").strip()
+        for row in rows
+        for column in ("HomeTeam", "AwayTeam")
+    }
+    matches_per_round = max(len(clubs) // 2, 1)
+    for index, row in enumerate(rows):
+        home = (row.get("HomeTeam") or "").strip()
+        away = (row.get("AwayTeam") or "").strip()
+        raw_date = (row.get("Date") or "").strip()
+        match_date = _date(raw_date)
+        matchday = integer(row.get("Matchday") or row.get("Round"))
+        if matchday is None:
+            # Football-Data files are published in fixture-round order but
+            # do not expose a round column. Infer it from the season's club
+            # count so vote rows can join to pre-match context.
+            matchday = index // matches_per_round + 1
+        source_ref = source_match_ref(season_code, match_date, home, away)
+        home_id = club_id(conn, home, "football-data.co.uk")
+        away_id = club_id(conn, away, "football-data.co.uk")
+        conn.execute(
+            """INSERT INTO matches
+                   (season_id, matchday, match_date, home_club_id, away_club_id,
                     home_goals, away_goals, home_goals_half, away_goals_half,
                     source_id, source_match_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(source_id, source_match_id)
-                   DO UPDATE SET home_goals=excluded.home_goals,
+                   DO UPDATE SET matchday=excluded.matchday,
+                     home_goals=excluded.home_goals,
                      away_goals=excluded.away_goals, updated_at=datetime('now')""",
-                (season_id, match_date, home_id, away_id, integer(row.get("FTHG")),
-                 integer(row.get("FTAG")), integer(row.get("HTHG")), integer(row.get("HTAG")),
-                 sid, source_ref),
-            )
-            match = conn.execute(
-                "SELECT id FROM matches WHERE source_id = ? AND source_match_id = ?",
-                (sid, source_ref),
-            ).fetchone()
-            match_id = int(match["id"])
-            _upsert_team_stats(conn, match_id, home_id, "home", row)
-            _upsert_team_stats(conn, match_id, away_id, "away", row)
-            _upsert_odds(conn, match_id, row)
-            loaded += 1
+            (
+                season_id,
+                matchday,
+                match_date,
+                home_id,
+                away_id,
+                integer(row.get("FTHG")),
+                integer(row.get("FTAG")),
+                integer(row.get("HTHG")),
+                integer(row.get("HTAG")),
+                sid,
+                source_ref,
+            ),
+        )
+        match = conn.execute(
+            "SELECT id FROM matches WHERE source_id = ? AND source_match_id = ?",
+            (sid, source_ref),
+        ).fetchone()
+        match_id = int(match["id"])
+        _upsert_team_stats(conn, match_id, home_id, "home", row)
+        _upsert_team_stats(conn, match_id, away_id, "away", row)
+        _upsert_odds(conn, match_id, row)
+        loaded += 1
     return loaded
 
 
@@ -91,9 +118,17 @@ def _upsert_team_stats(conn, match_id: int, club: int, side: str, row: dict) -> 
              shots_on_target=excluded.shots_on_target, corners=excluded.corners,
              fouls=excluded.fouls, yellow_cards=excluded.yellow_cards,
              red_cards=excluded.red_cards""",
-        (match_id, club, side, integer(row.get(f"{prefix}S")), integer(row.get(f"{prefix}ST")),
-         integer(row.get(f"{prefix}C")), integer(row.get(f"{prefix}F")),
-         integer(row.get(f"{prefix}Y")), integer(row.get(f"{prefix}R"))),
+        (
+            match_id,
+            club,
+            side,
+            integer(row.get(f"{prefix}S")),
+            integer(row.get(f"{prefix}ST")),
+            integer(row.get(f"{prefix}C")),
+            integer(row.get(f"{prefix}F")),
+            integer(row.get(f"{prefix}Y")),
+            integer(row.get(f"{prefix}R")),
+        ),
     )
 
 
@@ -130,5 +165,7 @@ def _season_id(conn, label: str) -> int:
     row = conn.execute("SELECT id FROM seasons WHERE name = ?", (label,)).fetchone()
     if row:
         return int(row["id"])
-    cursor = conn.execute("INSERT INTO seasons (name, start_year) VALUES (?, ?)", (label, int(label[:4])))
+    cursor = conn.execute(
+        "INSERT INTO seasons (name, start_year) VALUES (?, ?)", (label, int(label[:4]))
+    )
     return int(cursor.lastrowid)

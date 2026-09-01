@@ -58,6 +58,17 @@ class MatchDataBuilder:
                     )
                 votes_df = self.votes_processor.process_all_matchdays()
 
+        if match_context is None and config.DATA_DIR.joinpath("fantapredictor.db").exists():
+            from src.db import database, repository
+
+            conn = database.get_connection(config.DATA_DIR / "fantapredictor.db")
+            try:
+                match_context = repository.load_match_context(
+                    conn, through_season=self.season
+                )
+            finally:
+                conn.close()
+
         if votes_df.empty:
             raise ValueError(
                 "Observed vote data is required for training; no synthetic targets are generated."
@@ -173,15 +184,25 @@ class MatchDataBuilder:
 
         if match_context is not None and not match_context.empty:
             context = match_context.copy()
+            if "team_normalized" not in dataset.columns and "team" in dataset.columns:
+                dataset["team_normalized"] = dataset["team"].map(normalize_team_name)
             if "team" in context.columns:
                 context["team_normalized"] = context["team"].map(normalize_team_name)
+            if "context_available" not in context.columns:
+                context["context_available"] = 1
             if "team_normalized" in dataset.columns:
+                join_columns = ["matchday", "team_normalized"]
+                if "season" in context.columns and "season" in dataset.columns:
+                    join_columns.insert(0, "season")
                 dataset = dataset.merge(
                     context,
-                    on=["matchday", "team_normalized"],
+                    on=join_columns,
                     how="left",
                     suffixes=("", "_context"),
                 )
+                dataset["context_available"] = pd.to_numeric(
+                    dataset.get("context_available"), errors="coerce"
+                ).fillna(0)
             else:
                 dataset["context_available"] = 0
         else:

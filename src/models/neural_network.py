@@ -39,6 +39,13 @@ class FantacalcioPredictor:
             "mean_vote",
             "mean_fantavoto",
             "is_home",
+            "context_available",
+            "team_xg_for_last5",
+            "team_xg_against_last5",
+            "team_points_last5",
+            "opponent_xg_for_last5",
+            "opponent_xg_against_last5",
+            "opponent_points_last5",
         ]
         self.scaler = StandardScaler()
         self.outfield_model = None

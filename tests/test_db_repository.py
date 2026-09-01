@@ -18,8 +18,15 @@ class DatabaseRepositoryTests(unittest.TestCase):
             season_id = conn.execute("SELECT id FROM seasons WHERE name = '2026/27'").fetchone()[0]
             understat_id = conn.execute("SELECT id FROM sources WHERE slug = 'understat'").fetchone()[0]
             fantasy_id = conn.execute("SELECT id FROM sources WHERE slug = 'fantacalcio'").fetchone()[0]
+            football_data_id = conn.execute(
+                "SELECT id FROM sources WHERE slug = 'football-data.co.uk'"
+            ).fetchone()[0]
             conn.execute("INSERT INTO clubs (name) VALUES ('Test FC')")
+            conn.execute("INSERT INTO clubs (name) VALUES ('Opponent FC')")
             club_id = conn.execute("SELECT id FROM clubs WHERE name = 'Test FC'").fetchone()[0]
+            opponent_id = conn.execute(
+                "SELECT id FROM clubs WHERE name = 'Opponent FC'"
+            ).fetchone()[0]
             conn.execute(
                 "INSERT INTO players (full_name, normalized_name, role) VALUES (?, ?, ?)",
                 ("Test Player", "test player", "A"),
@@ -61,6 +68,17 @@ class DatabaseRepositoryTests(unittest.TestCase):
                    VALUES (?, ?, ?, 'A', 20, ?, 'price-1')""",
                 (season_id, player_id, club_id, fantasy_id),
             )
+            conn.executemany(
+                """INSERT INTO matches
+                   (season_id, matchday, match_date, home_club_id, away_club_id,
+                    home_goals, away_goals, home_xg, away_xg, source_id,
+                    source_match_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                [
+                    (season_id, 1, "2026-08-22", club_id, opponent_id, 2, 1, 1.5, 0.8, football_data_id, "match-1"),
+                    (season_id, 2, "2026-08-29", opponent_id, club_id, 0, 0, 0.7, 1.1, football_data_id, "match-2"),
+                ],
+            )
             fbref_id = conn.execute("SELECT id FROM sources WHERE slug = 'fbref'").fetchone()[0]
             conn.execute(
                 """INSERT INTO player_season_stat_values
@@ -77,6 +95,7 @@ class DatabaseRepositoryTests(unittest.TestCase):
             season_votes = repository.load_votes(conn, season="2627")
             prices = repository.load_prices(conn, "2627")
             skills = repository.load_player_skill_stats(conn, "2627")
+            context = repository.load_match_context(conn, through_season="2627")
             conn.close()
 
             self.assertEqual(rosters.loc[0, "status"], "confirmed")
@@ -90,6 +109,14 @@ class DatabaseRepositoryTests(unittest.TestCase):
             self.assertEqual(season_votes["season"].unique().tolist(), ["2026/27"])
             self.assertEqual(prices.loc[0, "price_current"], 20.0)
             self.assertEqual(skills.loc[0, "fbref_passing_progressive_passes"], 12.0)
+            test_second = context[
+                context["team_normalized"].eq("Test FC")
+                & context["matchday"].eq(2)
+            ].iloc[0]
+            self.assertEqual(test_second["is_home"], 0.0)
+            self.assertEqual(test_second["team_xg_for_last5"], 1.5)
+            self.assertEqual(test_second["team_xg_against_last5"], 0.8)
+            self.assertEqual(test_second["team_points_last5"], 3.0)
 
 
 if __name__ == "__main__":
