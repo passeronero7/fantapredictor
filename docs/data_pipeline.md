@@ -88,6 +88,23 @@ python scripts/reconcile_official_transfers.py --season 2627
 python scripts/validate_release.py --season 2627 --require-confirmed --require-lineup
 ```
 
+Alternatively, the `soccerdata` Understat adapter exports the same player-season
+column contract together with a source URL and retrieval-time manifest. It is a
+fallback for the direct snapshot above; it does not include the companion match
+snapshot:
+
+```bash
+python scripts/download_understat_data.py --season 2627
+python scripts/build_database.py --season 2627 \
+  --understat data/season_2026_27/raw/soccerdata/understat_soccerdata_player_season_2627.csv
+```
+
+The adapter does not establish squad eligibility, fantasy role, or votes. It is
+therefore a feature source only; use official/Fantacalcio data for those
+contracts. The client cache remains next to the snapshot and may be discarded
+with the ignored raw data. A repeat fetch refuses to overwrite data unless
+`--overwrite` is supplied.
+
 See [club-grade data strategy](club_grade_data_strategy.md) for the lawful
 source hierarchy, snapshot policy, and analysis features.
 

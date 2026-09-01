@@ -52,6 +52,9 @@ All notable project changes are recorded here.
 
 ### Added
 
+- A `soccerdata` Understat adapter and CLI now retrieve a current Serie A
+  player-season snapshot in the existing warehouse-ingestor CSV contract,
+  retaining a source URL, retrieval timestamp, and local client cache.
 - Chronological evaluation metrics and CLI for held-out matchday ranges,
   including point error and SHASH quantile/interval coverage.
 - Bounded SHASH parameter decoding and median-based point outputs prevent
