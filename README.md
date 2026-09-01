@@ -54,7 +54,7 @@ python scripts/run_pipeline.py --stage training-data --season 2627 --include-his
 python scripts/run_pipeline.py --stage train --season 2627
 python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
 python scripts/run_pipeline.py --stage lineup --matchday 1 --season 2627
-python scripts/evaluate_model.py --season 2425 --cutoff-matchday 20
+python scripts/evaluate_model.py --season 2425 --cutoffs 10,20,30
 ```
 
 Before an auction or model run, validate the private snapshot:

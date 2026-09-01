@@ -88,7 +88,13 @@ def player_id(conn, name: str, source: str, source_ref: Any = None, role: str | 
     if row is not None:
         pid = int(row["player_id"] if "player_id" in row.keys() else row["id"])
         if role:
-            conn.execute("UPDATE players SET role = COALESCE(role, ?) WHERE id = ?", (role, pid))
+            if source == "fantacalcio":
+                conn.execute("UPDATE players SET role = ? WHERE id = ?", (role, pid))
+            else:
+                conn.execute(
+                    "UPDATE players SET role = COALESCE(role, ?) WHERE id = ?",
+                    (role, pid),
+                )
     else:
         cursor = conn.execute(
             "INSERT INTO players (full_name, normalized_name, role, source_id, source_ref) VALUES (?, ?, ?, ?, ?)",

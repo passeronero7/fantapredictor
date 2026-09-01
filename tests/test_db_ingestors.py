@@ -25,7 +25,7 @@ class DatabaseIngestorTests(unittest.TestCase):
             understat = root / "understat.csv"
             understat.write_text(
                 "player_name,id,team_title,year,league,primary_position,games,time,goals,assists,npg,npxG,xG,xA,xGChain,xGBuildup,shots,key_passes,yellow_cards,red_cards\n"
-                "Test Defender,101,\"Test FC,Previous FC\",2024,Serie_A,D,20,1800,2,3,2,1.2,2.0,3.0,4.5,1.5,20,10,2,0\n",
+                "Test Defender,101,\"Test FC,Previous FC\",2024,Serie_A,DF,20,1800,2,3,2,1.2,2.0,3.0,4.5,1.5,20,10,2,0\n",
                 encoding="utf-8",
             )
 
@@ -94,6 +94,12 @@ class DatabaseIngestorTests(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT matchday FROM matches").fetchone()[0], 1)
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM player_season_stats").fetchone()[0], 1)
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM match_odds").fetchone()[0], 1)
+            self.assertEqual(
+                connection.execute(
+                    "SELECT role FROM players WHERE normalized_name = 'test defender'"
+                ).fetchone()[0],
+                "D",
+            )
             self.assertEqual(
                 connection.execute(
                     """SELECT c.name FROM player_season_stats ps

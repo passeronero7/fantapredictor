@@ -12,6 +12,8 @@
   season and creates season-specific player snapshots.
 - Match feature matrices now include home/away, opponent identity and rolling
   five-match team/opponent xG, xG-against and points form from prior fixtures.
+- Evaluation supports disjoint expanding walk-forward windows and reports
+  aggregate, per-window, role, club, and historical-minute metrics.
 
 ### Fixed
 
@@ -21,6 +23,8 @@
   instead of being accepted without effect.
 - Football-Data match ingestion assigns round numbers from fixture order when
   the provider file has no matchday field, enabling historical context joins.
+- Fantacalcio roles now take precedence over generic provider positions in the
+  player identity record and evaluation cohorts.
 - Missing Fantacalcio provider IDs no longer collapse every player from a club
   into one warehouse identity.
 - Compact pre-2000 season codes such as `9394` and `9900` now resolve to

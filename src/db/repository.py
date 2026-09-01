@@ -92,7 +92,8 @@ def load_votes(
     return pd.read_sql_query(
         f"""
         SELECT p.full_name AS player, p.normalized_name AS player_normalized,
-               p.role, c.name AS team, r.matchday, r.vote, r.fantavoto,
+               COALESCE(rm.role, p.role) AS role, c.name AS team, r.matchday,
+               r.vote, r.fantavoto,
                r.vote_statistical, r.fantavoto_statistical, r.vote_italy,
                r.fantavoto_italy, r.goals, r.goals_conceded, r.assists,
                r.yellow_cards, r.red_cards, r.penalties_saved,
@@ -102,6 +103,9 @@ def load_votes(
         JOIN players AS p ON p.id = r.player_id
         LEFT JOIN clubs AS c ON c.id = r.club_id
         JOIN seasons AS s ON s.id = r.season_id
+        LEFT JOIN roster_memberships AS rm
+          ON rm.player_id = r.player_id AND rm.club_id = r.club_id
+         AND rm.season_id = r.season_id
         {where}
         ORDER BY s.start_year, r.matchday, p.full_name
         """,
