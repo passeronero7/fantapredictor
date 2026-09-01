@@ -10,13 +10,22 @@ from src.utils.name_matching import normalize_name
 
 
 def _surname_initial(name: str) -> tuple[str, str]:
-    """Return a surname/initial pair for full and ``Surname I.`` names."""
+    """Return a surname/initial pair for full and ``Surname I.`` names.
+
+    The surname is everything but the first name token (assumed single-word)
+    on the full-name side, and everything but the trailing initial on the
+    abbreviated ``Surname I.`` side, so multi-word surnames (``De Bruyne``,
+    ``El Shaarawy``) still produce matching signatures on both sides instead
+    of only comparing their first word.
+    """
     tokens = normalize_name(name).split()
     if not tokens:
         return "", ""
-    if len(tokens) > 1 and len(tokens[-1]) == 1:
-        return tokens[0], tokens[-1]
-    return tokens[-1], tokens[0][0]
+    if len(tokens) == 1:
+        return tokens[0], tokens[0][0]
+    if len(tokens[-1]) == 1:
+        return " ".join(tokens[:-1]), tokens[-1]
+    return " ".join(tokens[1:]), tokens[0][0]
 
 
 def merge_current_prices(players_df: pd.DataFrame, prices_df: pd.DataFrame) -> pd.DataFrame:

@@ -45,6 +45,25 @@ class PricesProcessorTests(unittest.TestCase):
         self.assertEqual(result.loc[0, "role"], "A")
         self.assertEqual(result.loc[0, "price_match"], "surname_initial")
 
+    def test_merge_matches_abbreviated_multi_word_surname(self):
+        players = pd.DataFrame([{
+            "player": "Kevin De Bruyne",
+            "player_normalized": "kevin de bruyne",
+            "role": "",
+        }])
+        prices = pd.DataFrame([{
+            "player": "De Bruyne K.",
+            "price_current": 40,
+            "fvm": 400,
+            "role_classic": "C",
+            "role_mantra": "t",
+        }])
+
+        result = merge_current_prices(players, prices)
+
+        self.assertEqual(result.loc[0, "price"], 40)
+        self.assertEqual(result.loc[0, "price_match"], "surname_initial")
+
 
 if __name__ == "__main__":
     unittest.main()

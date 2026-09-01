@@ -60,9 +60,18 @@ class VotesProcessor:
 
     @staticmethod
     def _clean_grade(raw_val: str, default: float = 6.0) -> float:
-        """Parse raw grade string, normalizing comma decimals and scaling two-digit codes."""
-        if not raw_val or str(raw_val).strip() in {"", "-", "*", "s.v.", "sv", "nan"}:
-            return default
+        """Parse raw grade string, normalizing comma decimals and scaling two-digit codes.
+
+        A blank cell or a "did not play" marker (``s.v.``, ``-``, ...) means no
+        grade was given, not a grade of ``default``: it must come back as NaN so
+        that appearance counts (``notna().cumsum()`` in ``match_data_builder``)
+        and vote filters (``vote > 0`` in ``players_processor``) correctly treat
+        the matchday as unplayed instead of averaging in a fabricated score.
+        ``default`` is only used when the cell holds text that fails to parse as
+        a number at all.
+        """
+        if raw_val is None or pd.isna(raw_val) or str(raw_val).strip() in {"", "-", "*", "s.v.", "sv", "nan"}:
+            return float("nan")
         cleaned = str(raw_val).replace(",", ".").replace("*", "").strip()
         try:
             val = float(cleaned)

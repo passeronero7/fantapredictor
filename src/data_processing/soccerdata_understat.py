@@ -15,6 +15,8 @@ from typing import Any, Callable
 
 import pandas as pd
 
+from src.db.ingestors.common import season_label as _season_label
+
 UNDERSTAT_LEAGUE = "ITA-Serie A"
 UNDERSTAT_URL_TEMPLATE = "https://understat.com/league/Serie_A/{start_year}"
 ARCHIVE_COLUMNS = [
@@ -44,10 +46,12 @@ ARCHIVE_COLUMNS = [
 def season_start_year(season: str | int) -> int:
     """Return the start year from compact or human-readable season input."""
     text = str(season).strip().replace("_", "-").replace("/", "-")
-    if len(text) == 4 and text.isdigit() and text[:2] not in {"19", "20"}:
-        return 2000 + int(text[:2])
     if len(text) == 4 and text.isdigit():
-        return int(text)
+        # Delegate compact-code disambiguation to the canonical parser used by
+        # the warehouse ingestors: a heuristic keyed on the leading two digits
+        # (e.g. "not 19 or 20") misreads compact codes like "1920" (2019/20)
+        # or "2021" (2020/21) as literal years, mislabeling the season.
+        return int(_season_label(text).split("/")[0])
     if len(text) == 7 and text[4] == "-" and text[:4].isdigit() and text[5:].isdigit():
         start_year, end_year = int(text[:4]), int(text[5:])
         if end_year != (start_year + 1) % 100:

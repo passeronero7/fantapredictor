@@ -192,6 +192,39 @@ class DatabaseIngestorTests(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertIsNone(rows[0][0])
 
+    def test_votes_reingestion_picks_up_corrected_bonus_malus_fields(self):
+        from src.db.ingestors import votes as votes_ingestor
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            votes_dir = root / "votes"
+            votes_dir.mkdir()
+            vote_file = votes_dir / "Voti_Stagione_2024-25_Giornata_01.csv"
+            vote_file.write_text(
+                "Codice;Ruolo;Giocatore;Squadra;Voto;Fantavoto;Gol;Gs;Amm;Esp;Rf;Aut\n"
+                "201;D;Test Defender;Test FC;6;6;0;0;0;0;0;0\n",
+                encoding="utf-8",
+            )
+            conn = database.get_connection(root / "fantapredictor.db")
+            database.init_schema(conn)
+            votes_ingestor.load(conn, votes_dir, "2425")
+
+            # A post-hoc "voti corretti" bulletin revises cards/penalties/own
+            # goals for the same player/matchday without changing vote/fantavoto.
+            vote_file.write_text(
+                "Codice;Ruolo;Giocatore;Squadra;Voto;Fantavoto;Gol;Gs;Amm;Esp;Rf;Aut\n"
+                "201;D;Test Defender;Test FC;6;6;0;1;1;0;1;1\n",
+                encoding="utf-8",
+            )
+            votes_ingestor.load(conn, votes_dir, "2425")
+
+            row = conn.execute(
+                """SELECT goals_conceded, yellow_cards, penalties_scored, own_goals
+                   FROM player_match_ratings"""
+            ).fetchone()
+            conn.close()
+            self.assertEqual(tuple(row), (1, 1, 1, 1))
+
     def test_roster_ingestor_rejects_invalid_status(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -204,6 +237,60 @@ class DatabaseIngestorTests(unittest.TestCase):
 
             with self.assertRaises(ValueError):
                 build(root / "fantapredictor.db", roster_path=roster, season="2627")
+
+    def test_matchday_inference_survives_a_postponed_fixture(self):
+        from src.db.ingestors import football_data
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            season_dir = root / "2425"
+            season_dir.mkdir()
+            fieldnames = [
+                "Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "HTHG", "HTAG",
+            ]
+            # Round-robin among A, B, C, D where B-D (nominally round 2) is
+            # postponed and actually played after round 3's fixtures.
+            fixtures = [
+                ("01/09/2024", "A", "B"),
+                ("01/09/2024", "C", "D"),
+                ("08/09/2024", "A", "C"),
+                ("15/09/2024", "A", "D"),
+                ("15/09/2024", "B", "C"),
+                ("22/09/2024", "B", "D"),  # the postponed round-2 fixture
+            ]
+            with (season_dir / "I1.csv").open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                writer.writeheader()
+                for date, home, away in fixtures:
+                    writer.writerow({
+                        "Date": date, "HomeTeam": home, "AwayTeam": away,
+                        "FTHG": 1, "FTAG": 0, "HTHG": 0, "HTAG": 0,
+                    })
+
+            conn = database.get_connection(root / "fantapredictor.db")
+            database.init_schema(conn)
+            football_data.load(conn, root)
+
+            rows = conn.execute(
+                """SELECT m.matchday, hc.name AS home, ac.name AS away
+                   FROM matches m
+                   JOIN clubs hc ON hc.id = m.home_club_id
+                   JOIN clubs ac ON ac.id = m.away_club_id
+                   ORDER BY m.matchday"""
+            ).fetchall()
+            by_matchday: dict[int, list[str]] = {}
+            for row in rows:
+                by_matchday.setdefault(row["matchday"], []).extend([row["home"], row["away"]])
+
+            # The no-team-plays-twice-per-round invariant must hold for every
+            # inferred round, even though the postponed B-D fixture breaks the
+            # file's chronological round-robin block structure.
+            for matchday, clubs in by_matchday.items():
+                self.assertEqual(
+                    len(clubs), len(set(clubs)),
+                    f"club appears twice in inferred matchday {matchday}: {clubs}",
+                )
+            conn.close()
 
 
 if __name__ == "__main__":

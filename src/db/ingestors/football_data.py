@@ -51,12 +51,7 @@ def _load_file(conn, path: Path, season_code: str) -> int:
             and (row.get("AwayTeam") or "").strip()
             and (row.get("Date") or "").strip()
         ]
-    clubs = {
-        (row.get(column) or "").strip()
-        for row in rows
-        for column in ("HomeTeam", "AwayTeam")
-    }
-    matches_per_round = max(len(clubs) // 2, 1)
+    inferred_matchdays = _infer_matchdays(rows)
     for index, row in enumerate(rows):
         home = (row.get("HomeTeam") or "").strip()
         away = (row.get("AwayTeam") or "").strip()
@@ -64,10 +59,7 @@ def _load_file(conn, path: Path, season_code: str) -> int:
         match_date = _date(raw_date)
         matchday = integer(row.get("Matchday") or row.get("Round"))
         if matchday is None:
-            # Football-Data files are published in fixture-round order but
-            # do not expose a round column. Infer it from the season's club
-            # count so vote rows can join to pre-match context.
-            matchday = index // matches_per_round + 1
+            matchday = inferred_matchdays[index]
         source_ref = source_match_ref(season_code, match_date, home, away)
         home_id = club_id(conn, home, "football-data.co.uk")
         away_id = club_id(conn, away, "football-data.co.uk")
@@ -105,6 +97,30 @@ def _load_file(conn, path: Path, season_code: str) -> int:
         _upsert_odds(conn, match_id, row)
         loaded += 1
     return loaded
+
+
+def _infer_matchdays(rows: list[dict]) -> list[int]:
+    """Assign each row the earliest round in which neither club has already played.
+
+    Football-Data files omit a round column but are published in chronological
+    fixture order, so a position-based ``index // matches_per_round`` guess
+    silently desyncs after any postponed or rescheduled fixture (common in
+    COVID-affected seasons): a team can then appear twice within the same
+    inferred round for every match that follows. Tracking each club's
+    last-used round instead keeps the no-team-plays-twice-per-round invariant
+    regardless of how the fixture order deviates from a perfect round-robin
+    block.
+    """
+    last_round: dict[str, int] = {}
+    assigned: list[int] = []
+    for row in rows:
+        home = (row.get("HomeTeam") or "").strip()
+        away = (row.get("AwayTeam") or "").strip()
+        round_number = max(last_round.get(home, 0), last_round.get(away, 0)) + 1
+        last_round[home] = round_number
+        last_round[away] = round_number
+        assigned.append(round_number)
+    return assigned
 
 
 def _upsert_team_stats(conn, match_id: int, club: int, side: str, row: dict) -> None:

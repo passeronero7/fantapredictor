@@ -37,6 +37,12 @@ class SeasonParsingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             season_start_year("2026-29")
 
+    def test_disambiguates_compact_codes_starting_with_19_or_20(self):
+        # "1920" and "2021" are compact YYZZ codes, not literal years: they
+        # must resolve the same way as src.db.ingestors.common.season_label.
+        self.assertEqual(season_start_year("1920"), 2019)
+        self.assertEqual(season_start_year("2021"), 2020)
+
 
 class SoccerdataUnderstatTests(unittest.TestCase):
     def test_adapter_matches_existing_understat_ingestor_contract(self):

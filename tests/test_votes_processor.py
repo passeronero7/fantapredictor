@@ -30,6 +30,17 @@ class VotesProcessorTests(unittest.TestCase):
         finally:
             tmp_path.unlink(missing_ok=True)
 
+    def test_did_not_play_marker_becomes_nan_not_a_fabricated_six(self):
+        import math
+
+        self.assertTrue(math.isnan(VotesProcessor._clean_grade("s.v.")))
+        self.assertTrue(math.isnan(VotesProcessor._clean_grade("")))
+        self.assertTrue(math.isnan(VotesProcessor._clean_grade("-")))
+
+    def test_real_zero_grade_is_not_treated_as_missing(self):
+        self.assertEqual(VotesProcessor._clean_grade(0.0), 0.0)
+        self.assertEqual(VotesProcessor._clean_grade("0"), 0.0)
+
     def test_parse_matchday_html_extracts_votes_and_bonuses(self):
         sample_html = """
         <table>
