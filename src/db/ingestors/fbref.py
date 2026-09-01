@@ -26,7 +26,8 @@ from src.utils.name_matching import normalize_name
 
 _IDENTIFIER_COLUMNS = {
     "player", "player_name", "squad", "team", "club", "nation", "nationality",
-    "position", "pos", "age", "born", "matches", "comp", "competition",
+    "position", "pos", "age", "born", "rank", "fbref_player_id", "matches",
+    "comp", "competition",
 }
 _CLUB_COLUMNS = ("squad", "team", "club")
 
