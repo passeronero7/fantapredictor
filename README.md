@@ -50,7 +50,7 @@ python scripts/inspect_database.py --db data/fantapredictor.db summary
 # Run data pipeline stages
 python scripts/run_pipeline.py --stage manual-fbref --season 2627
 python scripts/run_pipeline.py --stage players --season 2627
-python scripts/run_pipeline.py --stage training-data --season 2627
+python scripts/run_pipeline.py --stage training-data --season 2627 --include-history
 python scripts/run_pipeline.py --stage train --season 2627
 python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
 python scripts/run_pipeline.py --stage lineup --matchday 1 --season 2627

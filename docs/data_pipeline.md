@@ -177,7 +177,10 @@ against official club announcements or manually verified sources before use.
 ## Training Safety
 
 `MatchDataBuilder` refuses to create synthetic targets when votes are absent.
-For historical training rows it replaces all-season vote aggregates with
+With `--include-history`, it loads all observed vote seasons through the target
+season and derives a roster snapshot from that season's observed players.
+Understat season aggregates are restricted to seasons strictly before each
+target season. It also replaces all-season vote aggregates with season-scoped,
 expanding prior-only aggregates, preventing the target matchday from leaking
 into its own features. Missing fixture context is represented explicitly as
 `context_available=0`; it is never silently converted to `is_home=1`.

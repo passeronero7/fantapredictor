@@ -8,9 +8,15 @@
   scores, matchday numbers, and team xG alongside player-season aggregates.
 - The warehouse builder ingests the Understat match snapshot when the
   Football-Data.co.uk current-season file is unavailable.
+- Historical training now loads every observed vote season through the target
+  season and creates season-specific player snapshots.
 
 ### Fixed
 
+- Player-season aggregates are restricted to seasons strictly before each
+  target season, preventing future and same-season feature leakage.
+- The pipeline's `--include-history` flag now changes the training population
+  instead of being accepted without effect.
 - Missing Fantacalcio provider IDs no longer collapse every player from a club
   into one warehouse identity.
 - Compact pre-2000 season codes such as `9394` and `9900` now resolve to

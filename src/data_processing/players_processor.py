@@ -28,17 +28,24 @@ class PlayersProcessor:
         history_df: Optional[pd.DataFrame] = None,
         votes_df: Optional[pd.DataFrame] = None,
         skill_stats_df: Optional[pd.DataFrame] = None,
+        as_of_season: Optional[str] = None,
     ) -> pd.DataFrame:
-        """Merge roster, historical event data (xG/xA), and in-season votes into unified records."""
+        """Merge sources using only aggregates from before ``as_of_season``."""
+        cutoff_season = as_of_season or self.season
         # 1. Load active roster and history from SQLite when available.
-        if roster_df is None and self.db_path.exists():
+        if self.db_path.exists() and (
+            roster_df is None or history_df is None or skill_stats_df is None
+        ):
             from src.db import database, repository
 
             conn = database.get_connection(self.db_path)
             try:
-                roster_df = repository.load_rosters(conn, self.season)
+                if roster_df is None:
+                    roster_df = repository.load_rosters(conn, self.season)
                 if history_df is None:
-                    history_df = repository.load_player_history(conn)
+                    history_df = repository.load_player_history(
+                        conn, before_season=cutoff_season
+                    )
                 if skill_stats_df is None:
                     skill_stats_df = repository.load_player_skill_stats(conn, self.season)
             finally:
@@ -79,6 +86,17 @@ class PlayersProcessor:
                 history_df = pd.DataFrame()
 
         # Compute aggregate historical metrics per player
+        if not history_df.empty:
+            if "year" not in history_df.columns:
+                raise ValueError(
+                    "Historical player aggregates require a season year for leakage-safe use"
+                )
+            from src.db.ingestors.common import season_label
+
+            cutoff_year = int(season_label(cutoff_season).split("/", 1)[0])
+            history_year = pd.to_numeric(history_df["year"], errors="coerce")
+            history_df = history_df[history_year < cutoff_year].copy()
+
         if not history_df.empty:
             if "player_normalized" not in history_df.columns:
                 player_col = "player" if "player" in history_df.columns else "player_name"

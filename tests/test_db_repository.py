@@ -10,7 +10,11 @@ class DatabaseRepositoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             conn = database.get_connection(Path(temporary) / "research.db")
             database.init_schema(conn)
+            conn.execute("INSERT INTO seasons (name, start_year) VALUES ('2025/26', 2025)")
             conn.execute("INSERT INTO seasons (name, start_year) VALUES ('2026/27', 2026)")
+            prior_season_id = conn.execute(
+                "SELECT id FROM seasons WHERE name = '2025/26'"
+            ).fetchone()[0]
             season_id = conn.execute("SELECT id FROM seasons WHERE name = '2026/27'").fetchone()[0]
             understat_id = conn.execute("SELECT id FROM sources WHERE slug = 'understat'").fetchone()[0]
             fantasy_id = conn.execute("SELECT id FROM sources WHERE slug = 'fantacalcio'").fetchone()[0]
@@ -37,6 +41,13 @@ class DatabaseRepositoryTests(unittest.TestCase):
                 (player_id, club_id, season_id, understat_id),
             )
             conn.execute(
+                """INSERT INTO player_season_stats
+                   (player_id, club_id, season_id, games, minutes, xg, xa,
+                    source_id, source_ref)
+                   VALUES (?, ?, ?, 20, 1800, 4.0, 2.0, ?, 'understat-prior')""",
+                (player_id, club_id, prior_season_id, understat_id),
+            )
+            conn.execute(
                 """INSERT INTO player_match_ratings
                    (season_id, matchday, player_id, club_id, vote, fantavoto,
                     source_id, source_ref)
@@ -61,17 +72,22 @@ class DatabaseRepositoryTests(unittest.TestCase):
 
             rosters = repository.load_rosters(conn, "2627")
             history = repository.load_player_history(conn)
+            safe_history = repository.load_player_history(conn, before_season="2627")
             votes = repository.load_votes(conn)
+            season_votes = repository.load_votes(conn, season="2627")
             prices = repository.load_prices(conn, "2627")
             skills = repository.load_player_skill_stats(conn, "2627")
             conn.close()
 
             self.assertEqual(rosters.loc[0, "status"], "confirmed")
-            self.assertEqual(history.loc[0, "player_name"], "Test Player")
-            self.assertEqual(history.loc[0, "xG"], 2.0)
-            self.assertEqual(history.loc[0, "xGChain"], 3.0)
-            self.assertEqual(history.loc[0, "xGBuildup"], 1.5)
+            current_history = history[history["year"].eq(2026)].iloc[0]
+            self.assertEqual(current_history["player_name"], "Test Player")
+            self.assertEqual(current_history["xG"], 2.0)
+            self.assertEqual(current_history["xGChain"], 3.0)
+            self.assertEqual(current_history["xGBuildup"], 1.5)
+            self.assertEqual(safe_history["year"].tolist(), [2025])
             self.assertEqual(votes.loc[0, "fantavoto"], 9.0)
+            self.assertEqual(season_votes["season"].unique().tolist(), ["2026/27"])
             self.assertEqual(prices.loc[0, "price_current"], 20.0)
             self.assertEqual(skills.loc[0, "fbref_passing_progressive_passes"], 12.0)
 

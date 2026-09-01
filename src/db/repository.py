@@ -28,10 +28,25 @@ def load_rosters(conn: sqlite3.Connection, season: str) -> pd.DataFrame:
     )
 
 
-def load_player_history(conn: sqlite3.Connection, league: str = "Serie_A") -> pd.DataFrame:
-    """Load player-season statistics in the shape expected by processors."""
+def load_player_history(
+    conn: sqlite3.Connection,
+    league: str = "Serie_A",
+    before_season: str | int | None = None,
+) -> pd.DataFrame:
+    """Load player-season statistics known before ``before_season``.
+
+    Season aggregates are only safe predictive features for a later season.
+    Passing a cutoff therefore excludes the cutoff season itself as well as
+    every later season.
+    """
+    params: tuple[object, ...] = ()
+    season_filter = ""
+    if before_season is not None:
+        cutoff_year = int(season_label(before_season).split("/", 1)[0])
+        season_filter = " AND s.start_year < ?"
+        params = (cutoff_year,)
     frame = pd.read_sql_query(
-        """
+        f"""
         SELECT ps.id, p.full_name AS player_name,
                p.normalized_name AS player_normalized,
                p.role AS primary_position, c.name AS team_title,
@@ -45,19 +60,35 @@ def load_player_history(conn: sqlite3.Connection, league: str = "Serie_A") -> pd
         LEFT JOIN clubs AS c ON c.id = ps.club_id
         JOIN seasons AS s ON s.id = ps.season_id
         JOIN sources AS src ON src.id = ps.source_id
-        WHERE src.slug = 'understat'
+        WHERE src.slug = 'understat'{season_filter}
         ORDER BY p.full_name, s.start_year
         """,
         conn,
+        params=params,
     )
     frame["league"] = league
     return frame
 
 
-def load_votes(conn: sqlite3.Connection) -> pd.DataFrame:
-    """Load official player-match ratings from the warehouse."""
+def load_votes(
+    conn: sqlite3.Connection,
+    season: str | int | None = None,
+    through_season: str | int | None = None,
+) -> pd.DataFrame:
+    """Load official ratings, optionally for one season or through a season."""
+    if season is not None and through_season is not None:
+        raise ValueError("Use either season or through_season, not both")
+    where = ""
+    params: tuple[object, ...] = ()
+    if season is not None:
+        where = "WHERE s.name = ?"
+        params = (season_label(season),)
+    elif through_season is not None:
+        cutoff_year = int(season_label(through_season).split("/", 1)[0])
+        where = "WHERE s.start_year <= ?"
+        params = (cutoff_year,)
     return pd.read_sql_query(
-        """
+        f"""
         SELECT p.full_name AS player, p.normalized_name AS player_normalized,
                p.role, c.name AS team, r.matchday, r.vote, r.fantavoto,
                r.vote_statistical, r.fantavoto_statistical, r.vote_italy,
@@ -69,9 +100,11 @@ def load_votes(conn: sqlite3.Connection) -> pd.DataFrame:
         JOIN players AS p ON p.id = r.player_id
         LEFT JOIN clubs AS c ON c.id = r.club_id
         JOIN seasons AS s ON s.id = r.season_id
+        {where}
         ORDER BY s.start_year, r.matchday, p.full_name
         """,
         conn,
+        params=params,
     )
 
 

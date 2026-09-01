@@ -57,6 +57,25 @@ class PlayersProcessorTests(unittest.TestCase):
         )
         self.assertEqual(result.loc[0, "fbref_passing_progressive_passes"], 15.0)
 
+    def test_merge_excludes_current_and_future_season_aggregates(self):
+        roster = pd.DataFrame([
+            {"player": "Player", "player_normalized": "player", "status": "confirmed"},
+        ])
+        history = pd.DataFrame([
+            {"player_normalized": "player", "year": 2023, "time": 900, "xG": 2.0, "xA": 1.0, "npxG": 2.0, "games": 10, "goals": 2, "assists": 1, "primary_position": "M"},
+            {"player_normalized": "player", "year": 2024, "time": 900, "xG": 20.0, "xA": 10.0, "npxG": 20.0, "games": 10, "goals": 20, "assists": 10, "primary_position": "M"},
+            {"player_normalized": "player", "year": 2025, "time": 900, "xG": 30.0, "xA": 15.0, "npxG": 30.0, "games": 10, "goals": 30, "assists": 15, "primary_position": "M"},
+        ])
+
+        result = PlayersProcessor(season="2425").merge_all_sources(
+            roster_df=roster,
+            history_df=history,
+            skill_stats_df=pd.DataFrame(),
+        )
+
+        self.assertEqual(result.loc[0, "hist_xg"], 2.0)
+        self.assertEqual(result.loc[0, "latest_year"], 2023)
+
     def test_match_builder_rejects_missing_observed_targets(self):
         players = pd.DataFrame([{"player": "Player", "role": "D"}])
         with self.assertRaises(ValueError):
@@ -77,6 +96,29 @@ class PlayersProcessorTests(unittest.TestCase):
         )["outfield"].sort_values("matchday")
         self.assertTrue(pd.isna(result.iloc[0]["mean_vote"]))
         self.assertEqual(result.iloc[1]["mean_vote"], 7.0)
+
+    def test_match_builder_include_history_adds_prior_seasons_and_resets_priors(self):
+        votes = pd.DataFrame([
+            {"season": "2023/24", "player": "Player", "player_normalized": "player", "team": "Roma", "role": "D", "matchday": 1, "vote": 6.0, "fantavoto": 6.0},
+            {"season": "2023/24", "player": "Player", "player_normalized": "player", "team": "Roma", "role": "D", "matchday": 2, "vote": 7.0, "fantavoto": 7.0},
+            {"season": "2024/25", "player": "Player", "player_normalized": "player", "team": "Roma", "role": "D", "matchday": 1, "vote": 5.0, "fantavoto": 5.0},
+            {"season": "2024/25", "player": "Player", "player_normalized": "player", "team": "Roma", "role": "D", "matchday": 2, "vote": 6.5, "fantavoto": 6.5},
+        ])
+        players = pd.DataFrame([
+            {"player": "Player", "player_normalized": "player", "role": "D", "hist_minutes": 900},
+        ])
+
+        current = MatchDataBuilder(season="2425").build_complete_dataset(
+            votes_df=votes, players_df=players
+        )["outfield"]
+        historical = MatchDataBuilder(season="2425").build_complete_dataset(
+            include_historical=True, votes_df=votes, players_df=players
+        )["outfield"]
+
+        self.assertEqual(len(current), 2)
+        self.assertEqual(len(historical), 4)
+        first_rows = historical.sort_values(["season", "matchday"]).groupby("season").head(1)
+        self.assertTrue(first_rows["mean_vote"].isna().all())
 
 
 if __name__ == "__main__":

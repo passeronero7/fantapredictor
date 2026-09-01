@@ -204,18 +204,15 @@ class VotesProcessor:
     def load_from_database(self, db_path: Optional[str | Path] = None) -> pd.DataFrame:
         """Load this season's votes from the authoritative SQLite warehouse."""
         from src.db import database, repository
-        from src.db.ingestors.common import season_label
 
         path = Path(db_path or config.DATA_DIR / "fantapredictor.db")
         if not path.exists():
             raise FileNotFoundError(f"SQLite warehouse not found: {path}")
         conn = database.get_connection(path)
         try:
-            frame = repository.load_votes(conn)
+            frame = repository.load_votes(conn, season=self.season)
         finally:
             conn.close()
-        if "season" in frame.columns:
-            frame = frame[frame["season"].eq(season_label(self.season))].copy()
         return frame.reset_index(drop=True)
 
     @classmethod
