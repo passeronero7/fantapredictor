@@ -1,9 +1,55 @@
 # Changelog
 
+## [0.7.0] - 2026-09-02
+
+Implements `docs/ingestion_and_fixing_strategy.md` Strategy A/B (see that
+document for the full design record and acceptance criteria).
+
+### Added
+
+- A declared source manifest, `config/data_sources.json`, resolved by the new
+  `src/db/build.py`: `scripts/build_database.py` no longer discovers seasons
+  or files through ad hoc globs when no explicit source path is passed (A3,
+  B1).
+- Per-source checksum-skip: a manifest source whose file/directory content
+  matches its last successful load is skipped instead of re-ingested, tracked
+  in the new `source_checksums` table (B2).
+- Per-source error isolation: a failing manifest source is rolled back and
+  recorded without aborting the rest of the build; `build_database.py` exits
+  non-zero and prints a summary only if any source failed (B2).
+- `PRAGMA user_version` schema versioning. `src/db/database.py::init_schema`
+  refuses to open a database from a newer core version and applies an
+  explicit, ordered migration list instead of one hardcoded function (A4,
+  B3).
+- `scripts/build_database.py --rebuild --confirm-wipe`: drops and recreates
+  the schema from `schema.sql`, then reloads the full manifest, for
+  reproducible from-scratch rebuilds (A4, B4). `--force` reloads every
+  manifest source regardless of checksum-skip.
+- `scripts/evaluate_model.py` now reports a hard `gate` verdict: the SHASH
+  model must beat both the global-median and expanding-prior baselines on
+  fantavoto MAE, else the script exits non-zero and prints that the run is
+  not approved for auction or lineup decisions (A2's baseline gate; the
+  broader historical-coverage and expected-minutes feature work in A2 is not
+  part of this change -- it needs a data-sourcing decision, not just code).
+- `fantapredictor-workspace/scripts/sync_workspace.sh` automates the
+  `docs/operations_runbook.md` Git Synchronization flow and refuses to
+  detach the submodule while it has uncommitted changes (A5).
+
+### Fixed
+
+- `scripts/run_pipeline.py`'s training stage now builds its dataset directly
+  from `MatchDataBuilder` (the same warehouse-backed reader used by stage 4
+  and `evaluate_model.py`) instead of unconditionally reading
+  `mid_outputs/database_entries(_gk).xlsx`, so `--stage train` no longer
+  requires `--stage training-data` to have run first in the same process
+  (A1).
+
 ## [0.6.0] - 2026-09-01
 
 ### Added
 
+- Offline normalization of browser-copied FBref CSVs, including their citation
+  preamble and duplicated grouped metric headers, before warehouse ingestion.
 - Current-season Understat downloads now retain completed fixtures, final
   scores, matchday numbers, and team xG alongside player-season aggregates.
 - The warehouse builder ingests the Understat match snapshot when the

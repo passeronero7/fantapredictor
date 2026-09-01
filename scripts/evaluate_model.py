@@ -80,6 +80,7 @@ def evaluate(
         "expanding_prior_baseline": score_predictions(prior_baseline),
     }
     result.update(breakdowns(prediction_frame))
+    result["gate"] = gate_result(result)
     if return_frames:
         return result, {
             "model": prediction_frame,
@@ -87,6 +88,31 @@ def evaluate(
             "expanding_prior_baseline": prior_baseline,
         }
     return result
+
+
+def gate_result(result: dict[str, object]) -> dict[str, object]:
+    """Hard pass/fail: the model must beat both baselines on fantavoto MAE.
+
+    Per docs/ingestion_and_fixing_strategy.md (Strategy A2): no model is
+    approved for auction or lineup decisions until it beats the
+    global-median and expanding-prior baselines on disjoint held-out
+    windows. ``result`` must carry ``overall``/``baseline``/
+    ``expanding_prior_baseline`` score dicts, as returned by ``evaluate``
+    and ``evaluate_walk_forward``.
+    """
+    overall = result["overall"]
+    baseline = result["baseline"]
+    prior = result["expanding_prior_baseline"]
+    beats_baseline = overall["fantavoto_mae"] <= baseline["fantavoto_mae"]
+    beats_prior = overall["fantavoto_mae"] <= prior["fantavoto_mae"]
+    return {
+        "passed": beats_baseline and beats_prior,
+        "model_fantavoto_mae": overall["fantavoto_mae"],
+        "baseline_fantavoto_mae": baseline["fantavoto_mae"],
+        "expanding_prior_baseline_fantavoto_mae": prior["fantavoto_mae"],
+        "beats_baseline": beats_baseline,
+        "beats_expanding_prior_baseline": beats_prior,
+    }
 
 
 def breakdowns(predictions: pd.DataFrame) -> dict[str, object]:
@@ -168,6 +194,7 @@ def evaluate_walk_forward(
         "windows": windows,
     }
     result.update(breakdowns(combined["model"]))
+    result["gate"] = gate_result(result)
     return result
 
 
@@ -214,6 +241,20 @@ def main() -> None:
     output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))
     print(f"Saved evaluation to {output}")
+
+    gate = result["gate"]
+    if gate["passed"]:
+        print("GATE PASSED: model beats both baselines on fantavoto MAE.")
+    else:
+        print(
+            "GATE FAILED: model does not beat the global-median and/or "
+            "expanding-prior baseline on fantavoto MAE "
+            f"(model={gate['model_fantavoto_mae']:.3f}, "
+            f"baseline={gate['baseline_fantavoto_mae']:.3f}, "
+            f"expanding_prior={gate['expanding_prior_baseline_fantavoto_mae']:.3f}). "
+            "Not approved for auction or lineup decisions."
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":

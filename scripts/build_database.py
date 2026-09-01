@@ -11,8 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from config.settings import config
+from src.db import build as build_module
 from src.db import database
 from src.db.ingestors import coaches, fbref, football_data, prices, rosters, understat, votes
+from src.db.ingestors.common import season_label
 
 
 def build(
@@ -25,64 +27,111 @@ def build(
     prices_path: str | Path | None = None,
     season: str = "2627",
     manual_fbref_dir: str | Path | None = None,
-) -> dict[str, int]:
-    """Initialize and populate the warehouse from local source snapshots."""
-    season_dir = config.get_season_dir(season)
-    roster_path = Path(
-        roster_path or season_dir / "rosters" /
-        f"virgilio_rosters_{season_dir.name.removeprefix('season_')}.csv"
-    )
-    if understat_path is not None:
-        understat_paths = [Path(understat_path)]
-        understat_match_paths: list[Path] = []
-    else:
-        raw_dir = season_dir / "raw"
-        understat_paths = [raw_dir / "understat_players_aggregated_2014_td.csv"]
-        understat_paths.extend(sorted(raw_dir.glob("understat_serie_a_*_season.csv")))
-        understat_paths = list(dict.fromkeys(understat_paths))
-        understat_match_paths = sorted(raw_dir.glob("understat_serie_a_*_matches.csv"))
-    explicit_votes_dir = votes_dir is not None
-    votes_dir = Path(votes_dir or season_dir / "fantacalcio" / config.VOTES_DIR)
-    matches_dir = Path(matches_dir or config.DATA_DIR / "raw" / "football-data.co.uk")
-    prices_path = Path(prices_path or season_dir / "fantacalcio" / "prices.csv")
-    manual_fbref_dir = Path(manual_fbref_dir or season_dir / "manual")
+    rebuild: bool = False,
+    confirm_wipe: bool = False,
+    force: bool = False,
+    manifest_file: str | Path | None = None,
+    data_dir: str | Path | None = None,
+) -> dict[str, object]:
+    """Initialize and populate the warehouse from local source snapshots.
+
+    A source with an explicit path argument is loaded directly from that
+    path. Every other source resolves from the declared
+    ``config/data_sources.json`` manifest (see
+    ``docs/ingestion_and_fixing_strategy.md``, Strategy B1) instead of
+    globbing the data directory. ``--rebuild`` drops the database first and
+    always loads the full manifest, ignoring explicit single-source paths
+    (except ``coaches``, which the manifest never declares).
+
+    A failing manifest source is isolated: it is recorded and skipped, and
+    the rest of the build continues (see the ``"_errors"`` key).
+    """
+    if rebuild:
+        if not confirm_wipe:
+            raise ValueError(
+                "rebuild=True drops and recreates the schema; pass confirm_wipe=True "
+                "(--rebuild --confirm-wipe on the CLI) to proceed"
+            )
+        database.wipe_database_file(db_path)
+        roster_path = understat_path = votes_dir = matches_dir = prices_path = None
+        manual_fbref_dir = None
+        force = True
 
     conn = database.get_connection(db_path)
     database.init_schema(conn)
-    counts: dict[str, int] = {}
+    counts: dict[str, object] = {}
+    errors: dict[str, str] = {}
+    manifest_sources = build_module.resolve_sources(season, manifest_file, data_dir)
+
+    def load_kind(kind: str) -> int:
+        total = 0
+        for source in manifest_sources:
+            if source.kind != kind:
+                continue
+            result = build_module.load_one_source(conn, source, force=force)
+            if result.status == "error":
+                errors[result.key] = result.detail or ""
+            total += result.rows
+        return total
+
     try:
-        # Load the active roster first so multi-club current-season aggregates
-        # can resolve to the officially reconciled destination club.
-        if roster_path.exists():
-            counts["rosters"] = rosters.load(conn, roster_path, season)
-        understat_loaded = 0
-        for path in understat_paths:
-            if path.exists():
-                understat_loaded += understat.load(conn, path)
-        if understat_loaded:
-            counts["understat"] = understat_loaded
-        understat_matches_loaded = sum(
-            understat.load_matches(conn, path) for path in understat_match_paths
-        )
-        if understat_matches_loaded:
-            counts["understat_matches"] = understat_matches_loaded
-        if explicit_votes_dir:
+        # Roster: load first so multi-club current-season aggregates can
+        # resolve to the officially reconciled destination club.
+        if roster_path is not None:
+            roster_path = Path(roster_path)
+            if roster_path.exists():
+                counts["rosters"] = rosters.load(conn, roster_path, season)
+        else:
+            counts["rosters"] = load_kind("roster")
+
+        if understat_path is not None:
+            counts["understat"] = understat.load(conn, Path(understat_path))
+        else:
+            counts["understat"] = load_kind("player-season")
+            counts["understat_matches"] = load_kind("understat-matches")
+
+        if votes_dir is not None:
+            votes_dir = Path(votes_dir)
             if votes_dir.exists():
                 counts["votes"] = votes.load(conn, votes_dir, season)
         else:
-            vote_directories = sorted(config.DATA_DIR.glob("season_*/fantacalcio/voti"))
-            for directory in vote_directories:
-                season_name = directory.parts[-3].removeprefix("season_")
-                season_value = season_name.replace("_", "/")
-                counts[f"votes_{season_name}"] = votes.load(conn, directory, season_value)
-        if matches_dir.exists():
-            counts["matches"] = football_data.load(conn, matches_dir)
+            for source in manifest_sources:
+                if source.kind != "votes":
+                    continue
+                result = build_module.load_one_source(conn, source, force=force)
+                if result.status == "error":
+                    errors[result.key] = result.detail or ""
+                elif result.rows:
+                    season_key = season_label(source.season).replace("/", "_")
+                    counts[f"votes_{season_key}"] = result.rows
+
+        if matches_dir is not None:
+            matches_dir = Path(matches_dir)
+            if matches_dir.exists():
+                counts["matches"] = football_data.load(conn, matches_dir)
+        else:
+            counts["matches"] = load_kind("match-results-tree")
+
         if coaches_path:
-            counts["coaches"] = coaches.load(conn, coaches_path)
-        if prices_path.exists():
-            counts["prices"] = prices.load(conn, prices_path, season)
-        if manual_fbref_dir.exists():
-            counts["fbref"] = fbref.load(conn, manual_fbref_dir, season)
+            counts["coaches"] = coaches.load(conn, Path(coaches_path))
+
+        if prices_path is not None:
+            prices_path = Path(prices_path)
+            if prices_path.exists():
+                counts["prices"] = prices.load(conn, prices_path, season)
+        else:
+            counts["prices"] = load_kind("prices")
+
+        if manual_fbref_dir is not None:
+            manual_fbref_dir = Path(manual_fbref_dir)
+            if manual_fbref_dir.exists():
+                counts["fbref"] = fbref.load(conn, manual_fbref_dir, season)
+        else:
+            counts["fbref"] = load_kind("fbref-manual")
+
+        counts = {key: value for key, value in counts.items() if value}
+        if errors:
+            counts["_errors"] = errors
         conn.commit()
         return counts
     finally:
@@ -100,6 +149,18 @@ def main() -> None:
     parser.add_argument("--coaches", type=Path)
     parser.add_argument("--prices", type=Path)
     parser.add_argument("--manual-fbref-dir", type=Path)
+    parser.add_argument(
+        "--rebuild", action="store_true",
+        help="Drop and recreate the schema, then reload the full declared manifest.",
+    )
+    parser.add_argument(
+        "--confirm-wipe", action="store_true",
+        help="Required alongside --rebuild to acknowledge the database is dropped first.",
+    )
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Reload every manifest source even if its checksum has not changed.",
+    )
     args = parser.parse_args()
     counts = build(
         args.db,
@@ -111,10 +172,20 @@ def main() -> None:
         args.prices,
         args.season,
         args.manual_fbref_dir,
+        rebuild=args.rebuild,
+        confirm_wipe=args.confirm_wipe,
+        force=args.force,
     )
+    errors = counts.pop("_errors", None)
     for name, count in counts.items():
         print(f"{name}: {count}")
+    if errors:
+        print("errors:")
+        for source_key, message in errors.items():
+            print(f"  {source_key}: {message}")
     print(f"database: {args.db}")
+    if errors:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

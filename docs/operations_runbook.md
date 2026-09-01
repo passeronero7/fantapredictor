@@ -41,6 +41,11 @@ $PYTHON fantapredictor_core/scripts/build_database.py \
   --db data/fantapredictor.db \
   --season 2627
 
+# From-scratch rebuild (drops and recreates the schema first):
+$PYTHON fantapredictor_core/scripts/build_database.py \
+  --db data/fantapredictor.db \
+  --season 2627 --rebuild --confirm-wipe
+
 $PYTHON fantapredictor_core/scripts/inspect_database.py \
   --db data/fantapredictor.db summary
 
@@ -100,8 +105,20 @@ $PYTHON fantapredictor_core/scripts/optimize_lineup.py \
 
 ## Git Synchronization
 
-Commit and push public code first. Then update the private submodule and push
-the private workspace:
+`fantapredictor-workspace/scripts/sync_workspace.sh` automates this flow: it
+pushes a configured public-core dev clone first (`FANTAPREDICTOR_CORE_REPO`,
+default `../fantapredictor` next to the workspace), refuses to continue if
+the `fantapredictor_core` submodule itself has uncommitted changes, then
+fetches/detaches the submodule to `origin/main` and commits and pushes the
+workspace:
+
+```bash
+cd /path/to/fantapredictor-workspace
+./scripts/sync_workspace.sh
+```
+
+Equivalent by hand -- commit and push public code first, then update the
+private submodule and push the private workspace:
 
 ```bash
 cd /path/to/fantapredictor

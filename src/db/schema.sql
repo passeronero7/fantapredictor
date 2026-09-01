@@ -38,6 +38,21 @@ CREATE TABLE IF NOT EXISTS ingestion_runs (
 );
 CREATE INDEX IF NOT EXISTS ix_ingestion_runs_source ON ingestion_runs (source_id);
 
+-- Last known outcome per *declared manifest source* (config/data_sources.json
+-- entry, keyed by its own slug -- distinct from `sources.slug`, which is the
+-- shared provider identity many manifest entries can share, e.g. one "votes"
+-- entry per season all pointing at the `fantacalcio` source). Lets a rebuild
+-- skip a source whose snapshot file/directory checksum has not changed since
+-- the last successful load.
+CREATE TABLE IF NOT EXISTS source_checksums (
+    source_key   TEXT PRIMARY KEY,
+    checksum     TEXT NOT NULL,
+    status       TEXT NOT NULL CHECK (status IN ('ok', 'error')),
+    rows_loaded  INTEGER,
+    detail       TEXT,
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- -----------------------------------------------------------------------------
 -- Core entities
 -- -----------------------------------------------------------------------------

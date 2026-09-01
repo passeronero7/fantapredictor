@@ -9,8 +9,15 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from typing import Callable
 
 SCHEMA_FILE = Path(__file__).parent / "schema.sql"
+
+# The integer stamped into `PRAGMA user_version` once schema.sql plus every
+# migration below has been applied. Bump this whenever a new migration is
+# appended; `schema.sql` itself always reflects the fully-migrated shape, so a
+# freshly created database goes straight to the current version.
+CURRENT_SCHEMA_VERSION = 1
 
 # Sources are registered once, keyed by slug. `licence` is a human-readable
 # summary of the terms we are relying on; every row lands in the `sources`
@@ -97,6 +104,19 @@ TEAM_ALIAS_MAP = {
 }
 
 
+def wipe_database_file(db_path: str | Path) -> None:
+    """Delete a SQLite database and its WAL/SHM sidecar files, if present.
+
+    Used by ``--rebuild`` to guarantee a from-scratch schema; callers are
+    responsible for gating this behind an explicit confirmation flag since it
+    is not reversible.
+    """
+    db_path = Path(db_path)
+    for suffix in ("", "-wal", "-shm"):
+        candidate = db_path.with_name(db_path.name + suffix) if suffix else db_path
+        candidate.unlink(missing_ok=True)
+
+
 def get_connection(db_path: str | Path) -> sqlite3.Connection:
     """Return a configured SQLite connection with the schema loaded."""
     db_path = Path(db_path)
@@ -110,27 +130,61 @@ def get_connection(db_path: str | Path) -> sqlite3.Connection:
 
 
 def init_schema(conn: sqlite3.Connection, schema_file: str | Path | None = None) -> None:
-    """Create all tables and indexes defined in the schema if they don't exist."""
+    """Create all tables and indexes defined in the schema if they don't exist.
+
+    Refuses to open a database stamped with a schema version newer than this
+    core version knows about -- that means the database was built by a newer
+    core and downgrading silently could misread or corrupt its rows.
+    """
+    on_disk_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    if on_disk_version > CURRENT_SCHEMA_VERSION:
+        raise RuntimeError(
+            f"Database schema version {on_disk_version} is newer than this "
+            f"fantapredictor_core supports ({CURRENT_SCHEMA_VERSION}). "
+            "Upgrade the core submodule before opening this database."
+        )
     schema_file = Path(schema_file) if schema_file else SCHEMA_FILE
     conn.executescript(schema_file.read_text(encoding="utf-8"))
-    _migrate_schema(conn)
+    _migrate_schema(conn, on_disk_version)
+    conn.execute(f"PRAGMA user_version = {CURRENT_SCHEMA_VERSION}")
     _seed_sources(conn)
     conn.commit()
 
 
-def _migrate_schema(conn: sqlite3.Connection) -> None:
-    """Apply additive migrations to databases created by earlier core versions."""
+def _add_roster_role_column(conn: sqlite3.Connection) -> None:
     roster_columns = {
         row["name"] for row in conn.execute("PRAGMA table_info(roster_memberships)")
     }
     if "role" not in roster_columns:
         conn.execute("ALTER TABLE roster_memberships ADD COLUMN role TEXT")
+
+
+def _add_player_stats_xg_columns(conn: sqlite3.Connection) -> None:
     player_stats_columns = {
         row["name"] for row in conn.execute("PRAGMA table_info(player_season_stats)")
     }
     for column in ("xg_chain", "xg_buildup"):
         if column not in player_stats_columns:
             conn.execute(f"ALTER TABLE player_season_stats ADD COLUMN {column} REAL")
+
+
+# Ordered, additive migrations keyed by the target `user_version` they bring a
+# database up to. `schema.sql` already reflects every migration's end state
+# (each callable is also idempotent), so these only matter for a database
+# created by an older core version whose `user_version` hasn't reached the
+# target yet -- including every pre-existing database, since `user_version`
+# was never stamped before this version-tracking was added.
+MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
+    (1, _add_roster_role_column),
+    (1, _add_player_stats_xg_columns),
+]
+
+
+def _migrate_schema(conn: sqlite3.Connection, on_disk_version: int) -> None:
+    """Apply every migration whose target version is newer than the database."""
+    for target_version, migration in MIGRATIONS:
+        if on_disk_version < target_version:
+            migration(conn)
 
 
 def _seed_sources(conn: sqlite3.Connection) -> None:

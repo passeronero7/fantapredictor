@@ -3,7 +3,7 @@ import unittest
 
 import pandas as pd
 
-from scripts.evaluate_model import breakdowns, parse_cutoffs
+from scripts.evaluate_model import breakdowns, gate_result, parse_cutoffs
 
 
 class EvaluateModelTests(unittest.TestCase):
@@ -35,6 +35,33 @@ class EvaluateModelTests(unittest.TestCase):
         self.assertEqual(
             set(result["by_historical_minutes"]), {"none", "high_2701_plus"}
         )
+
+    def test_gate_fails_when_model_loses_to_either_baseline(self):
+        result = gate_result({
+            "overall": {"fantavoto_mae": 1.860},
+            "baseline": {"fantavoto_mae": 0.801},
+            "expanding_prior_baseline": {"fantavoto_mae": 0.908},
+        })
+        self.assertFalse(result["passed"])
+        self.assertFalse(result["beats_baseline"])
+        self.assertFalse(result["beats_expanding_prior_baseline"])
+
+    def test_gate_passes_only_when_model_beats_both_baselines(self):
+        result = gate_result({
+            "overall": {"fantavoto_mae": 0.75},
+            "baseline": {"fantavoto_mae": 0.801},
+            "expanding_prior_baseline": {"fantavoto_mae": 0.908},
+        })
+        self.assertTrue(result["passed"])
+
+        mixed = gate_result({
+            "overall": {"fantavoto_mae": 0.85},
+            "baseline": {"fantavoto_mae": 0.801},
+            "expanding_prior_baseline": {"fantavoto_mae": 0.908},
+        })
+        self.assertFalse(mixed["passed"])
+        self.assertFalse(mixed["beats_baseline"])
+        self.assertTrue(mixed["beats_expanding_prior_baseline"])
 
 
 if __name__ == "__main__":

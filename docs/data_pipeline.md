@@ -13,6 +13,20 @@ validates and reads those local CSVs. The warehouse imports every numeric
 column with its source file, table category, original FBref header, and a
 normalized metric key.
 
+When FBref's **Get table as CSV (for Excel)** dialog is copied into a file, the
+capture includes citation lines and may repeat metric labels. Keep that raw
+capture outside the importer directory, then normalize it locally:
+
+```bash
+python scripts/prepare_manual_fbref.py --season 2627 \
+  --source-dir /path/to/data/raw/manual/fbref/serie_a/2026_27/inbox/players \
+  --output-dir /path/to/data/season_2026_27/manual
+```
+
+The helper makes no network requests, skips empty category templates, removes
+only the FBref preamble, and prefixes repeated headers with their table group
+(for example, `Performance Gls` and `Per 90 Minutes Gls`).
+
 ## Source Downloads
 
 ### Official Fantacalcio ratings
@@ -120,12 +134,49 @@ The core accepts `FANTAPREDICTOR_DATA_DIR` so the public submodule can use the
 private workspace's data directory. The warehouse is the intended source for
 pipeline retrieval; raw files are inputs to the builder, not model inputs.
 
-The default build scans all `data/season_*/fantacalcio/voti/` directories, so
-all downloaded historical vote seasons are loaded. It also loads the current
-Understat player and completed-match snapshots, current roster snapshot,
-Football-Data match files, and the current quotation CSV when present. If a
-`manual/` directory exists, it also imports local FBref exports. Supported
-filenames are:
+### Declared sources
+
+Every source a default build loads (when no `--roster`/`--understat`/
+`--votes-dir`/`--matches-dir`/`--prices`/`--manual-fbref-dir` override is
+passed) is declared in `config/data_sources.json` and resolved by
+`src/db/build.py` -- there is no implicit filesystem globbing left in
+`build_database.py` itself. Each entry declares a `kind` (which ingestor
+handles it), a `root` (`data_dir` or `season_dir`), a `pattern` (with
+`{season_compact}`/`{season_underscore}`/`{start_year}` placeholders, e.g.
+`2627`/`2026_27`/`2026`), and a `seasons` directive:
+`["$target"]` resolves only the `--season` passed on the command line,
+`["*"]` resolves every `season_YYYY_YY` directory found on disk (this is how
+votes stay multi-season: every downloaded historical vote season loads by
+default), and `[null]` is a single season-independent path (Football-Data's
+whole results tree, the Understat aggregate archive).
+
+Each resolved source is loaded with two safeguards:
+
+- **Checksum-skip.** A source's file (or, for a directory source, every file
+  under it) is hashed; if the last load recorded for that exact checksum
+  succeeded, the source is skipped instead of re-ingested. Outcomes are
+  tracked in the `source_checksums` table. Pass `--force` to reload
+  everything regardless.
+- **Per-source error isolation.** A source that fails to load is rolled
+  back and recorded, and the rest of the build continues. `build_database.py`
+  prints a summary and exits non-zero only if any source failed; nothing
+  else is silently swallowed.
+
+Two build modes:
+
+```bash
+# Incremental (default): only sources whose content changed since the last
+# successful load actually re-ingest.
+python scripts/build_database.py --db data/fantapredictor.db --season 2627
+
+# From-scratch rebuild: drops and recreates the schema from schema.sql, then
+# reloads the full manifest. Destructive, so it requires --confirm-wipe.
+python scripts/build_database.py --db data/fantapredictor.db --season 2627 \
+  --rebuild --confirm-wipe
+```
+
+If a `manual/` directory exists for the target season, the build also
+imports local FBref exports. Supported filenames are:
 
 ```text
 fbref_standard_<season>.csv           fbref_shooting_<season>.csv
@@ -150,7 +201,17 @@ an expected-goal chance and in the build-up before the final action.
 
 The build is idempotent for domain rows. Re-running it updates the same natural
 keys instead of duplicating players, ratings, matches, odds, or prices. Every
-run is recorded in `ingestion_runs`.
+ingestor call is recorded in `ingestion_runs`; every manifest source's
+last-known checksum and outcome is recorded in `source_checksums`.
+
+The schema is versioned with `PRAGMA user_version`, checked and stamped by
+`src/db/database.py::init_schema` on every connection. Opening a database
+whose version is newer than the running core's `CURRENT_SCHEMA_VERSION`
+raises immediately instead of silently misreading it; opening an older or
+untracked database (`user_version` still `0`, true of every database created
+before this was added) applies the ordered `MIGRATIONS` list additively, the
+same idempotent pattern `_migrate_schema` already used for the `role` and
+`xg_chain`/`xg_buildup` columns.
 
 If the `sqlite3` shell is unavailable, inspect the warehouse with the bundled
 standard-library CLI:

@@ -171,20 +171,23 @@ class FantacalcioPipeline:
         logger.info("=" * 60)
         
         try:
+            from src.data_processing.match_data_builder import MatchDataBuilder
             from src.models.neural_network import FantacalcioPredictor
-            
-            # Load training data
-            outfield_file = config.get_mid_output_path(config.DATABASE_ENTRIES_FILE, season=self.season)
-            gk_file = config.get_mid_output_path(config.DATABASE_ENTRIES_GK_FILE, season=self.season)
-            
-            import pandas as pd
-            outfield_data = pd.read_excel(outfield_file, index_col=0)
-            gk_data = pd.read_excel(gk_file, index_col=0)
-            
+
+            # Build training data directly from the warehouse -- the same
+            # single reader used by stage 4 and evaluate_model.py -- instead
+            # of depending on stage 4's mid_outputs Excel artifact having
+            # already been written in this process.
+            datasets = MatchDataBuilder(season=self.season).build_complete_dataset(
+                include_historical=self.include_history
+            )
+            outfield_data = datasets["outfield"]
+            gk_data = datasets["goalkeepers"]
+
             # Train model
             predictor = FantacalcioPredictor(season=self.season)
             history = predictor.train(
-                outfield_data, 
+                outfield_data,
                 gk_data,
                 epochs=epochs or config.NN_EPOCHS
             )

@@ -87,6 +87,27 @@ class SchemaTests(unittest.TestCase):
         count = self.conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
         self.assertEqual(count, 7)
 
+    def test_init_schema_stamps_user_version(self):
+        version = self.conn.execute("PRAGMA user_version").fetchone()[0]
+        self.assertEqual(version, db.CURRENT_SCHEMA_VERSION)
+
+    def test_init_schema_refuses_a_newer_database(self):
+        self.conn.execute(f"PRAGMA user_version = {db.CURRENT_SCHEMA_VERSION + 1}")
+        with self.assertRaises(RuntimeError):
+            db.init_schema(self.conn)
+
+    def test_legacy_zero_version_database_migrates_and_gets_stamped(self):
+        # Simulate a database created before user_version was ever set, with
+        # the additive columns missing (the pre-schema.sql-update shape).
+        legacy = db.get_connection(":memory:")
+        legacy.executescript(db.SCHEMA_FILE.read_text(encoding="utf-8"))
+        legacy.execute("PRAGMA user_version = 0")
+        db.init_schema(legacy)
+        self.assertEqual(
+            legacy.execute("PRAGMA user_version").fetchone()[0], db.CURRENT_SCHEMA_VERSION
+        )
+        legacy.close()
+
 
 if __name__ == "__main__":
     unittest.main()

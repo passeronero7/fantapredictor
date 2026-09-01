@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "slug": "roster",
+      "kind": "roster",
+      "root": "season_dir",
+      "pattern": "rosters/virgilio_rosters_{season_underscore}.csv",
+      "seasons": ["$target"]
+    },
+    {
+      "slug": "understat-aggregate",
+      "kind": "player-season",
+      "root": "data_dir",
+      "pattern": "season_2026_27/raw/understat_players_aggregated_2014_td.csv",
+      "seasons": [null]
+    },
+    {
+      "slug": "understat-season-snapshot",
+      "kind": "player-season",
+      "root": "season_dir",
+      "pattern": "raw/understat_serie_a_{start_year}_season.csv",
+      "seasons": ["$target"]
+    },
+    {
+      "slug": "understat-matches",
+      "kind": "understat-matches",
+      "root": "season_dir",
+      "pattern": "raw/understat_serie_a_{start_year}_matches.csv",
+      "seasons": ["$target"]
+    },
+    {
+      "slug": "votes",
+      "kind": "votes",
+      "root": "season_dir",
+      "pattern": "fantacalcio/voti",
+      "seasons": ["*"]
+    },
+    {
+      "slug": "football-data",
+      "kind": "match-results-tree",
+      "root": "data_dir",
+      "pattern": "raw/football-data.co.uk",
+      "seasons": [null]
+    },
+    {
+      "slug": "prices",
+      "kind": "prices",
+      "root": "season_dir",
+      "pattern": "fantacalcio/prices.csv",
+      "seasons": ["$target"]
+    },
+    {
+      "slug": "fbref-manual",
+      "kind": "fbref-manual",
+      "root": "season_dir",
+      "pattern": "manual",
+      "seasons": ["$target"]
+    }
+  ]
+}
