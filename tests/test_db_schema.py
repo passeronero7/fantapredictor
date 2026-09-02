@@ -1,4 +1,7 @@
+import sqlite3
+import tempfile
 import unittest
+from pathlib import Path
 
 from src.db import __version__
 from src.db import database as db
@@ -95,6 +98,17 @@ class SchemaTests(unittest.TestCase):
         self.conn.execute(f"PRAGMA user_version = {db.CURRENT_SCHEMA_VERSION + 1}")
         with self.assertRaises(RuntimeError):
             db.init_schema(self.conn)
+
+    def test_get_connection_refuses_a_newer_database(self):
+        # Repository readers call get_connection without init_schema, so the
+        # fail-fast check must live on the connection path too.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "newer.db"
+            raw = sqlite3.connect(str(path))
+            raw.execute(f"PRAGMA user_version = {db.CURRENT_SCHEMA_VERSION + 1}")
+            raw.close()
+            with self.assertRaises(RuntimeError):
+                db.get_connection(path)
 
     def test_legacy_zero_version_database_migrates_and_gets_stamped(self):
         # Simulate a database created before user_version was ever set, with

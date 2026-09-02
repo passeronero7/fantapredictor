@@ -23,7 +23,10 @@ class PlayersProcessorTests(unittest.TestCase):
         ])
 
         processor = PlayersProcessor(season="2627")
-        merged = processor.merge_all_sources(roster_df=roster_df, history_df=history_df, votes_df=votes_df)
+        merged = processor.merge_all_sources(
+            roster_df=roster_df, history_df=history_df, votes_df=votes_df,
+            skill_stats_df=pd.DataFrame(),
+        )
 
         self.assertEqual(len(merged), 2)
         lautaro = merged[merged["player_normalized"] == "lautaro martinez"].iloc[0]
@@ -41,6 +44,7 @@ class PlayersProcessorTests(unittest.TestCase):
         result = PlayersProcessor(season="2627").merge_all_sources(
             roster_df=roster,
             history_df=pd.DataFrame(),
+            skill_stats_df=pd.DataFrame(),
         )
 
         self.assertEqual(result["player_normalized"].tolist(), ["confirmed"])

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `get_connection` now fails fast on databases stamped with a newer schema
+  version, matching the existing `init_schema` guard: repository readers open
+  connections without running `init_schema`, so the check must live on the
+  connection path too.
+- `tests/test_players_processor.py` passes explicit empty skill-stat frames to
+  `merge_all_sources`, so the player-merge tests no longer depend on the
+  presence (or schema age) of a local `fantapredictor.db`.
+
 ### Evaluated
 
 - Whether a directories refactor would clean up the codebase. **Conclusion:

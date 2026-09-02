@@ -126,7 +126,26 @@ def get_connection(db_path: str | Path) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA busy_timeout = 5000")
+    _refuse_newer_schema(conn)
     return conn
+
+
+def _refuse_newer_schema(conn: sqlite3.Connection) -> None:
+    """Fail fast when the database was built by a newer core version.
+
+    A database stamped with a schema version greater than this code's
+    ``CURRENT_SCHEMA_VERSION`` may contain tables and columns this code does
+    not know about; reading from it or ingesting into it is unsafe. Repository
+    readers call :func:`get_connection` without ``init_schema``, so the check
+    must live on the connection path too.
+    """
+    on_disk_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    if on_disk_version > CURRENT_SCHEMA_VERSION:
+        raise RuntimeError(
+            f"Database schema version {on_disk_version} is newer than this "
+            f"fantapredictor_core supports ({CURRENT_SCHEMA_VERSION}). "
+            "Upgrade the core submodule before opening this database."
+        )
 
 
 def init_schema(conn: sqlite3.Connection, schema_file: str | Path | None = None) -> None:
@@ -136,13 +155,8 @@ def init_schema(conn: sqlite3.Connection, schema_file: str | Path | None = None)
     core version knows about -- that means the database was built by a newer
     core and downgrading silently could misread or corrupt its rows.
     """
+    _refuse_newer_schema(conn)
     on_disk_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-    if on_disk_version > CURRENT_SCHEMA_VERSION:
-        raise RuntimeError(
-            f"Database schema version {on_disk_version} is newer than this "
-            f"fantapredictor_core supports ({CURRENT_SCHEMA_VERSION}). "
-            "Upgrade the core submodule before opening this database."
-        )
     schema_file = Path(schema_file) if schema_file else SCHEMA_FILE
     conn.executescript(schema_file.read_text(encoding="utf-8"))
     _migrate_schema(conn, on_disk_version)
