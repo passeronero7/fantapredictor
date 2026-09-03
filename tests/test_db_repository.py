@@ -118,6 +118,40 @@ class DatabaseRepositoryTests(unittest.TestCase):
             self.assertEqual(test_second["team_xg_against_last5"], 0.8)
             self.assertEqual(test_second["team_points_last5"], 3.0)
 
+    def test_load_team_match_stats_returns_one_row_per_side(self):
+        conn = database.get_connection(":memory:")
+        database.init_schema(conn)
+        try:
+            conn.executemany(
+                "INSERT INTO sources (slug, name) VALUES (?, ?)",
+                [("test", "Test"), ("test2", "Test 2")],
+            )
+            conn.execute("INSERT INTO seasons (name, start_year) VALUES ('2026/27', 2026)")
+            conn.execute("INSERT INTO clubs (name) VALUES ('Home FC')")
+            conn.execute("INSERT INTO clubs (name) VALUES ('Away FC')")
+            conn.execute(
+                """INSERT INTO matches (season_id, matchday, match_date, home_club_id,
+                   away_club_id, home_goals, away_goals, source_id, source_match_id)
+                   VALUES (1, 1, '2026-08-20', 1, 2, 2, 1, 1, 'm1')"""
+            )
+            conn.executemany(
+                """INSERT INTO match_team_stats (match_id, club_id, side, shots, xg)
+                   VALUES (1, ?, ?, ?, ?)""",
+                [(1, "home", 15, 1.8), (2, "away", 8, 0.9)],
+            )
+            conn.commit()
+            stats = repository.load_team_match_stats(conn)
+            self.assertEqual(len(stats), 2)
+            home = stats[stats["team"] == "Home FC"].iloc[0]
+            self.assertEqual(home["goals_for"], 2)
+            self.assertEqual(home["goals_against"], 1)
+            self.assertEqual(home["shots"], 15)
+            away = stats[stats["team"] == "Away FC"].iloc[0]
+            self.assertEqual(away["goals_for"], 1)
+            self.assertEqual(away["shots"], 8)
+        finally:
+            conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,6 +4,21 @@
 
 ### Added
 
+- Auction propensity forecast (`src/models/propensity.py`,
+  `scripts/simulate_auction_propensity.py`): Monte Carlo time-series of each
+  priced confirmed player's propensity to hold a median good mark
+  (vote >= 6.0) over a horizon, conditioned on his own vote/bonus
+  distributions, an empirical-Bayes appearance rate, and the club's
+  statistical attitude (attack/defense style indices from shots and goals).
+  A walk-forward backtest mode scores calibration and Brier on completed
+  seasons; the 2025/26 study shows a monotone ranking signal with a
+  documented overconfidence bias in the upper bins. See
+  `docs/auction_propensity_forecast.md`.
+- `repository.load_team_match_stats`: one row per club appearance with
+  goals for/against and source-provided team statistics.
+- Coach-attitude conditioning hook (`coach_style_adjustments`), ready for the
+  `coach_club_seasons` table once the curated history is populated.
+
 - `scripts/promote_roster_from_prices.py` bridges roster and quotation
   identities: watchlist rows evidenced by the official Fantacalcio quotation
   list (same club, exact name, surname+initial, or a surname unique within

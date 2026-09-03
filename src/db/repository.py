@@ -134,6 +134,46 @@ def load_prices(conn: sqlite3.Connection, season: str) -> pd.DataFrame:
     )
 
 
+def load_team_match_stats(
+    conn: sqlite3.Connection,
+    through_season: str | int | None = None,
+) -> pd.DataFrame:
+    """Return one row per club appearance in a match, with team-level stats.
+
+    Each row carries the match identity (season, matchday, opponent,
+    home/away), the goals for/against, and whatever team statistics the
+    source provided (shots, corners, cards, possession, xG). Missing
+    statistics stay ``NaN`` -- sources cover different eras.
+    """
+    where = ""
+    params: tuple[object, ...] = ()
+    if through_season is not None:
+        cutoff_year = int(season_label(through_season).split("/", 1)[0])
+        where = "WHERE s.start_year <= ?"
+        params = (cutoff_year,)
+    return pd.read_sql_query(
+        f"""
+        SELECT s.name AS season, m.matchday, m.match_date,
+               c.name AS team, opp.name AS opponent,
+               CASE WHEN ts.side = 'home' THEN 1 ELSE 0 END AS is_home,
+               CASE WHEN ts.side = 'home' THEN m.home_goals ELSE m.away_goals END AS goals_for,
+               CASE WHEN ts.side = 'home' THEN m.away_goals ELSE m.home_goals END AS goals_against,
+               ts.shots, ts.shots_on_target, ts.corners, ts.fouls,
+               ts.yellow_cards, ts.red_cards, ts.possession, ts.xg
+        FROM match_team_stats AS ts
+        JOIN matches AS m ON m.id = ts.match_id
+        JOIN seasons AS s ON s.id = m.season_id
+        JOIN clubs AS c ON c.id = ts.club_id
+        JOIN clubs AS opp
+          ON opp.id = CASE WHEN ts.side = 'home' THEN m.away_club_id ELSE m.home_club_id END
+        {where}
+        ORDER BY s.start_year, m.matchday, c.name
+        """,
+        conn,
+        params=params,
+    )
+
+
 def load_player_skill_stats(conn: sqlite3.Connection, season: str) -> pd.DataFrame:
     """Return manually imported FBref metrics as one row per player.
 
