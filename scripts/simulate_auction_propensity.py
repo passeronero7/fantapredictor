@@ -163,6 +163,8 @@ def run_forecast(
         print(f"Archetype blend applied to {blended_rows} players")
 
     priced = attach_prices(propensity, repository.load_prices(conn, season))
+    confirmed_keys = set(rosters["player_normalized"])
+    priced = priced[priced["player_normalized"].isin(confirmed_keys)].copy()
     priced = priced[priced["price"].notna()].copy()
     if priced.empty:
         raise ValueError("No priced confirmed players available for the forecast")
