@@ -27,6 +27,27 @@ The official feed was refreshed after closure at 21:32 CEST on 1 September.
 Repeat the reconciliation for any official correction and after the winter
 window. The active population uses Venezia and excludes relegated Verona.
 
+The Lega feed can lag deadline-day registrations. After running it, bridge the
+fantasy universe with the official quotation list: promote watchlist rows that
+the quotations evidence and adopt priced players the roster snapshot is
+missing. Review the dry-run report first; `--apply` writes the roster CSV:
+
+```bash
+$PYTHON fantapredictor_core/scripts/promote_roster_from_prices.py \
+  --season 2627            # dry run: promotion report
+$PYTHON fantapredictor_core/scripts/promote_roster_from_prices.py \
+  --season 2627 --adopt-unmatched   # dry run incl. missing priced players
+$PYTHON fantapredictor_core/scripts/promote_roster_from_prices.py \
+  --season 2627 --adopt-unmatched --apply
+$PYTHON fantapredictor_core/scripts/build_database.py \
+  --db data/fantapredictor.db --season 2627 --rebuild --confirm-wipe
+```
+
+The rebuild is required after identity renames so stale memberships from old
+player rows cannot linger. The September 2026 reconciliation produced 795
+confirmed, 110 watchlist, and 32 excluded rows, with 503 of 587 priced players
+joined to confirmed memberships and every club able to field a priced 3-4-3.
+
 ## Rebuild And Inspect SQLite
 
 Run from the private workspace. The repository has no dependency on the
@@ -73,7 +94,9 @@ $PYTHON fantapredictor_core/scripts/validate_release.py \
   --require-lineup
 ```
 
-This roster gate must pass before prediction or auction output. The 21:32 CEST
+This roster gate must pass before prediction or auction output. Add
+`--require-priced` so every default-formation slot must be fillable with
+priced confirmed players, not merely confirmed ones. The 21:32 CEST
 snapshot passes with 31 goalkeepers, 88 defenders, 83 midfielders, and 86
 forwards confirmed. Model approval is a separate gate and currently fails.
 
@@ -92,7 +115,11 @@ loses to both the global-median and expanding-prior baselines.
 
 ## Predict And Optimize
 
-For research-only output after training a model, run:
+The SHASH model currently fails its evaluation gate, so the predict stage
+automatically falls back to labelled global-median/expanding-prior baseline
+quantiles over priced confirmed players. The output records
+`prediction_source` per row; treat it as the research baseline, not a model
+verdict. For research-only output, run:
 
 ```bash
 $PYTHON fantapredictor_core/scripts/run_pipeline.py \

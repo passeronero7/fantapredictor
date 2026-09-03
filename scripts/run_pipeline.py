@@ -225,9 +225,21 @@ class FantacalcioPipeline:
             from src.data_processing.prices_processor import merge_current_prices
             from src.data_processing.votes_processor import VotesProcessor
             
-            # Load latest model
+            # Load latest model; without one, fall back to the baseline
+            # predictions that the evaluation record currently favours.
             predictor = FantacalcioPredictor(season=self.season)
-            predictor.load_latest_model()
+            try:
+                predictor.load_latest_model()
+                model_available = True
+            except Exception as exc:
+                logger.warning(
+                    "No usable trained model (%s); producing global-median "
+                    "baseline predictions instead", exc
+                )
+                model_available = False
+
+            if not model_available:
+                return self._run_baseline_predictions(matchday, merge_current_prices)
 
             # Build prediction features only from information available before
             # the requested matchday; do not use the target round itself.
@@ -276,6 +288,45 @@ class FantacalcioPipeline:
         except Exception as e:
             logger.error(f"Error generating predictions: {e}")
             raise
+
+    def _run_baseline_predictions(self, matchday: int, merge_current_prices):
+        """Produce baseline predictions from the warehouse when no model passes."""
+        import pandas as pd
+
+        from src.db import database, repository
+        from src.models.baselines import build_baseline_predictions
+
+        db_path = config.DATA_DIR / "fantapredictor.db"
+        if not db_path.exists():
+            raise FileNotFoundError(
+                "Baseline predictions need the SQLite warehouse at "
+                f"{db_path}; run build_database.py first"
+            )
+        conn = database.get_connection(db_path)
+        try:
+            predictions = build_baseline_predictions(conn, self.season, matchday)
+            prices = repository.load_prices(conn, self.season)
+        finally:
+            conn.close()
+        predictions = merge_current_prices(predictions, prices)
+        priced = predictions["price"].notna() if "price" in predictions.columns else predictions.index.notna()
+        dropped = int((~priced).sum())
+        predictions = predictions[priced].copy()
+        if predictions.empty:
+            raise ValueError("No priced confirmed players are available for baseline predictions")
+        if dropped:
+            logger.warning(f"Excluded {dropped} confirmed players without a quotation price")
+        output_file = config.get_season_dir(self.season) / "outputs" / f"pred_matchday_{matchday}.xlsx"
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        predictions.to_excel(output_file)
+        sources = predictions["prediction_source"].value_counts().to_dict()
+        logger.info(
+            "✓ Generated BASELINE predictions (%s) for %d players; "
+            "the neural model is not approved for auction use",
+            sources, len(predictions),
+        )
+        logger.info(f"✓ Saved to {output_file}")
+        return predictions
 
     def run_stage_7_lineup(
         self,

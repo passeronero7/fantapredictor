@@ -2,8 +2,32 @@
 
 ## [Unreleased]
 
+### Added
+
+- `scripts/promote_roster_from_prices.py` bridges roster and quotation
+  identities: watchlist rows evidenced by the official Fantacalcio quotation
+  list (same club, exact name, surname+initial, or a surname unique within
+  the club) are promoted to `confirmed` and adopt the quotation spelling, and
+  `--adopt-unmatched` adds priced players missing from the roster snapshot as
+  confirmed (quotation evidence), moving surname-only confirmed rows at other
+  clubs when the role proves a missed transfer. Namesake conflicts are
+  reported, never guessed.
+- `scripts/validate_release.py --require-priced`: the default formation must
+  be fillable with *priced* confirmed players; unpriced warm bodies no longer
+  satisfy the release gate.
+- `src/models/baselines.py` and a baseline fallback in the predict stage:
+  without an approved model, `run_pipeline.py --stage predict` now emits
+  transparent global-median/expanding-prior quantiles for priced confirmed
+  players, labelled with `prediction_source`, so auction research no longer
+  depends on the unapproved SHASH network. Prior ratings strictly exclude the
+  target matchday.
+
 ### Fixed
 
+- Quotation-to-roster matching handles particle surnames (`Di Lorenzo`,
+  `De Bruyne`, `Da Cunha`) and double initials (`Esposito F.P.`,
+  `Sanchez Ro.`) via a surname-tail rule; ambiguity is reported instead of
+  guessed.
 - `get_connection` now fails fast on databases stamped with a newer schema
   version, matching the existing `init_schema` guard: repository readers open
   connections without running `init_schema`, so the check must live on the
