@@ -145,3 +145,26 @@ class SimulateHorizonTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CoachConditioningTests(unittest.TestCase):
+    def test_module_and_tag_deltas(self):
+        from src.models.propensity import coach_role_delta
+        cond = {"module": "3-4-2-1", "style_tags": ["possession", "wingback_attack"]}
+        self.assertGreater(coach_role_delta(cond, "D"), 0)
+        self.assertAlmostEqual(coach_role_delta(cond, "P"), 0.0)
+        pragmatic = {"module": "4-3-3", "style_tags": ["pragmatic"]}
+        self.assertGreater(coach_role_delta(pragmatic, "P"), 0)
+        self.assertLess(coach_role_delta(pragmatic, "A"), 0)
+        self.assertEqual(coach_role_delta(None, "A"), 0.0)
+
+    def test_coach_style_adjustments_empty_without_history(self):
+        import sqlite3
+        from src.db import database
+        from src.models.propensity import coach_style_adjustments
+        conn = database.get_connection(":memory:")
+        database.init_schema(conn)
+        try:
+            self.assertEqual(coach_style_adjustments(conn, "2026/27"), {})
+        finally:
+            conn.close()

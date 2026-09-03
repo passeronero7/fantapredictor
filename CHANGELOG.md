@@ -14,6 +14,11 @@
   seasons; the 2025/26 study shows a monotone ranking signal with a
   documented overconfidence bias in the upper bins. See
   `docs/auction_propensity_forecast.md`.
+- Coach and archetype conditioning for the propensity forecast: web-sourced
+  coach profiles (module + style tags, schema v2 `coaches` columns) drive
+  role deltas, and a k-NN over historical per-90 technique signatures
+  (xG/xA/shots/key passes/xGChain/xGBuildup + realised mark rates) blends
+  similar-player propensity into every estimate.
 - `repository.load_team_match_stats`: one row per club appearance with
   goals for/against and source-provided team statistics.
 - Coach-attitude conditioning hook (`coach_style_adjustments`), ready for the

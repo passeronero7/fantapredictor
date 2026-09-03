@@ -26,8 +26,11 @@ from config.settings import config
 from src.db import database, repository
 from src.models.propensity import (
     SimulationConfig,
+    archetype_estimates,
     backtest_propensity,
     club_style_index,
+    coach_role_delta,
+    coach_style_adjustments,
     player_propensity,
     simulate_horizon,
 )
@@ -133,6 +136,31 @@ def run_forecast(
                 "p_plays": UNOBSERVED_P_PLAYS,
             })
         propensity = pd.concat([propensity, pd.DataFrame(rows)], ignore_index=True)
+
+    # Coach conditioning: module and style-tag deltas per role.
+    conditioning = coach_style_adjustments(conn, season_name)
+    print(f"Coach conditioning active for {len(conditioning)} clubs")
+    propensity["coach_delta"] = [
+        coach_role_delta(conditioning.get(team), role)
+        for team, role in zip(propensity["team"], propensity["role"])
+    ]
+    propensity["p_good_mark"] = (
+        (propensity["p_good_mark"] + propensity["coach_delta"]).clip(0.0, 1.0)
+    )
+
+    # Similar-player archetype blend: nearest same-role historical
+    # player-seasons by per-90 technique signature.
+    archetypes = archetype_estimates(conn, season, from_matchday)
+    if not archetypes.empty:
+        propensity = propensity.merge(archetypes, on="player_normalized", how="left")
+        own = propensity["p_good_mark"]
+        arch = propensity["archetype_p"]
+        n = propensity["appearances"].fillna(0)
+        own_weight = (n / (n + 6.0)).clip(0.35, 0.85)
+        blended = own_weight * own + (1 - own_weight) * arch
+        propensity["p_good_mark"] = blended.fillna(own).clip(0.0, 1.0)
+        blended_rows = int(propensity["archetype_p"].notna().sum())
+        print(f"Archetype blend applied to {blended_rows} players")
 
     priced = attach_prices(propensity, repository.load_prices(conn, season))
     priced = priced[priced["price"].notna()].copy()

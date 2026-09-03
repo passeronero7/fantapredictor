@@ -62,12 +62,35 @@ Walk-forward calibration of P(vote >= 6.0):
   pseudo-count before ranking baskets; both are one-line changes left
   deliberate until more windows are evaluated.
 
+## Coach and archetype conditioning (added 3 September)
+
+Web-sourced coach profiles (football-italia.net probable-modules article,
+19 August 2026) populate the curated `coach_club_seasons`/`coaches` tables for
+all 20 clubs with `preferred_module` and `style_tags` (schema v2 migration:
+`coaches.preferred_module`, `coaches.style_tags`). Two new conditioning layers:
+
+1. **Coach/module deltas**: transparent additive deltas per role — back-three
+   modules lift D (+0.02, wing-back potential), two-AM modules lift C (+0.02),
+   pragmatic/defensive-solidity tags lift P (+0.02) and penalise A (-0.01),
+   possession tags lift D/C (+0.01). Applied before simulation, clipped to
+   [0, 1].
+2. **Similar-player archetypes**: every historical player-season carries a
+   per-90 technique signature (xG, xA, shots, key passes, xGChain/xGBuildup)
+   and its realised share of 6.0+ marks. Each player is blended with the mean
+   propensity of his 20 nearest same-role neighbours (own observations get
+   weight n/(n+6), clamped to [0.35, 0.85]); unobserved players collapse
+   almost entirely to their archetype.
+
+With both layers active (300 simulations, MD3 horizon of 8): Caprile, Di
+Gregorio, De Gea and Modric reach P(median >= 6.0) = 1.00; Modric's Milan
+possession/3-4-2-1 profile lifts him above his raw history; Akanji enters the
+top 15 as the Inter back-three benefit materialises.
+
 ## Known limitations (frank list)
 
 1. **Random opponent pairing**: the official calendar is not ingested, so
    fixture difficulty is averaged rather than scheduled. Real fixtures would
    sharpen the horizon medians.
-2. **No coach conditioning yet** until the curated coach history is populated.
 3. **Overconfidence bias** documented above — treat absolute propensities as
    ranks, not calibrated probabilities, until recalibrated.
 4. New signings with zero Serie A observations enter at the role prior with a

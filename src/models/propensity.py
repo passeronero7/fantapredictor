@@ -27,25 +27,65 @@ import numpy as np
 import pandas as pd
 
 from src.db import repository
+from src.db.ingestors.common import season_label
 
 GOOD_VOTE_THRESHOLD = 6.0
 SHRINKAGE_OBSERVATIONS = 3.0
 STYLE_MULTIPLIER_CAP = (0.5, 2.0)
 
 
-def coach_style_adjustments(conn: sqlite3.Connection, season: str) -> dict[str, float]:
-    """Per-club style multiplier from the curated coach history.
+# Back-three modules historically lift defender marks (wing-back assists,
+# man-marking defenders rating well); two-AM modules lift creative midfielders.
+MODULE_ROLE_DELTAS = {
+    "3-5-2": {"D": 0.02},
+    "3-4-2-1": {"D": 0.02, "C": 0.01},
+    "4-2-3-1": {"C": 0.02},
+}
+TAG_ROLE_DELTAS = {
+    "pragmatic": {"P": 0.02, "A": -0.01},
+    "defensive_solidity": {"P": 0.02, "A": -0.01},
+    "high_risk": {"P": -0.01},
+    "man_marking": {"P": -0.01},
+    "possession": {"D": 0.01, "C": 0.01},
+    "wingback_attack": {"D": 0.01},
+}
 
-    Returns an empty mapping until ``coach_club_seasons`` is populated; the
-    simulation then runs purely on observed team statistics.
+
+def coach_style_adjustments(conn: sqlite3.Connection, season: str) -> dict[str, dict]:
+    """Per-club coach conditioning from the curated coach history.
+
+    Returns ``{club: {"module": str, "style_tags": [str]}}`` from
+    ``coach_club_seasons`` x ``coaches`` for ``season``; an empty mapping
+    means the curated table is unpopulated and team-style proxies stand in.
     """
-    count = conn.execute("SELECT COUNT(*) FROM coach_club_seasons").fetchone()[0]
-    if count:
-        raise NotImplementedError(
-            "Coach history is populated; define the coach-attitude weighting "
-            "with the data owner before enabling it"
+    return {
+        row["team"]: {
+            "module": row["preferred_module"],
+            "style_tags": [t for t in (row["style_tags"] or "").split("|") if t],
+        }
+        for row in conn.execute(
+            """
+            SELECT c.name AS team, co.preferred_module, co.style_tags
+            FROM coach_club_seasons AS ccs
+            JOIN coaches AS co ON co.id = ccs.coach_id
+            JOIN clubs AS c ON c.id = ccs.club_id
+            JOIN seasons AS s ON s.id = ccs.season_id
+            WHERE s.name = ?
+            """,
+            (season,),
         )
-    return {}
+    }
+
+
+def coach_role_delta(club_conditioning: dict | None, role: str) -> float:
+    """Additive good-mark propensity delta for a role under his coach."""
+    if not club_conditioning:
+        return 0.0
+    role = str(role).strip().upper()
+    delta = MODULE_ROLE_DELTAS.get(club_conditioning.get("module") or "", {}).get(role, 0.0)
+    for tag in club_conditioning.get("style_tags", []):
+        delta += TAG_ROLE_DELTAS.get(tag, {}).get(role, 0.0)
+    return delta
 
 
 def club_style_index(team_stats: pd.DataFrame, season: str | None = None) -> pd.DataFrame:
@@ -394,3 +434,88 @@ def backtest_propensity(
             ],
         })
     return {"season": season, "good_vote": good_vote, "cutoffs": reports}
+
+
+def archetype_estimates(
+    conn: sqlite3.Connection,
+    season: str,
+    cutoff_matchday: int,
+    neighbours: int = 20,
+) -> pd.DataFrame:
+    """Similar-player propensity: k-NN over per-90 technique features.
+
+    Every historical player-season carries per-90 xG, xA, shots, key passes,
+    minutes and Understat xGChain/xGBuildup (the "technique" signature) plus
+    the realised share of 6.0+ marks from the ratings of that same season.
+    A current player is matched to his ``neighbours`` most similar same-role
+    historical player-seasons; the weighted mean of their good-mark rates is
+    his archetype propensity.
+    """
+    from src.utils.name_matching import normalize_name  # noqa: F401 (symmetry)
+
+    history = repository.load_player_history(conn, before_season=season)
+    history = history[history["time"].fillna(0) >= 450].copy()
+    if history.empty:
+        return pd.DataFrame(columns=["player_normalized", "archetype_p", "archetype_n"])
+    for column in ("xG", "xA", "shots", "key_passes"):
+        history[f"{column}_p90"] = history[column] / history["time"] * 90.0
+    history["xgchain_p90"] = history["xGChain"] / history["time"] * 90.0
+    history["xgbuildup_p90"] = history["xGBuildup"] / history["time"] * 90.0
+    feature_columns = [
+        "xG_p90", "xA_p90", "shots_p90", "key_passes_p90",
+        "xgchain_p90", "xgbuildup_p90",
+    ]
+    history[feature_columns] = history[feature_columns].fillna(0.0)
+    history[feature_columns] = history[feature_columns].clip(
+        lower=history[feature_columns].quantile(0.01), upper=history[feature_columns].quantile(0.99),
+        axis=1,
+    )
+    votes = repository.load_votes(conn, through_season=season)
+    season_name = season_label(season)
+    votes = votes[
+        ~votes["season"].astype(str).eq(season_name)
+        | (
+            votes["season"].astype(str).eq(season_name)
+            & pd.to_numeric(votes["matchday"], errors="coerce") < cutoff_matchday
+        )
+    ]
+    vote_rate = votes.dropna(subset=["vote"]).groupby(
+        ["player_normalized", "season"]
+    )["vote"].apply(lambda v: float((v >= GOOD_VOTE_THRESHOLD).mean()))
+    history["season_name"] = [season_label(int(y)) for y in history["year"]]
+    history["vote_rate"] = [
+        vote_rate.get((key, name), np.nan)
+        for key, name in zip(history["player_normalized"], history["season_name"])
+    ]
+    rated = history.dropna(subset=["vote_rate"])
+
+    means = history[feature_columns].mean()
+    stds = history[feature_columns].std(ddof=0).replace(0, 1.0)
+    normalized = (history[feature_columns] - means) / stds
+    records = []
+    positions = np.arange(len(history))
+    role_mask = history["primary_position"].to_numpy()
+    feature_matrix = normalized[feature_columns].to_numpy()
+    for index in positions:
+        same_role = positions[role_mask == role_mask[index]]
+        distances = np.linalg.norm(
+            feature_matrix[same_role] - feature_matrix[index], axis=1
+        )
+        order = np.argsort(distances)[: neighbours + 1]
+        candidates = same_role[order]
+        candidates = candidates[candidates != index][:neighbours]
+        candidate_keys = history["player_normalized"].iloc[candidates]
+        candidate_seasons = history["season_name"].iloc[candidates]
+        rated_neighbours = np.array([
+            vote_rate.get((key, name), np.nan)
+            for key, name in zip(candidate_keys, candidate_seasons)
+        ], dtype=float)
+        rated_neighbours = rated_neighbours[~np.isnan(rated_neighbours)]
+        if rated_neighbours.size == 0:
+            continue
+        records.append({
+            "player_normalized": history["player_normalized"].iloc[index],
+            "archetype_p": float(rated_neighbours.mean()),
+            "archetype_n": int(rated_neighbours.size),
+        })
+    return pd.DataFrame(records).drop_duplicates("player_normalized")

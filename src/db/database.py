@@ -17,7 +17,7 @@ SCHEMA_FILE = Path(__file__).parent / "schema.sql"
 # migration below has been applied. Bump this whenever a new migration is
 # appended; `schema.sql` itself always reflects the fully-migrated shape, so a
 # freshly created database goes straight to the current version.
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 # Sources are registered once, keyed by slug. `licence` is a human-readable
 # summary of the terms we are relying on; every row lands in the `sources`
@@ -182,6 +182,16 @@ def _add_player_stats_xg_columns(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE player_season_stats ADD COLUMN {column} REAL")
 
 
+def _add_coach_style_columns(conn: sqlite3.Connection) -> None:
+    """Coach preferred module and style tags (added in schema v2)."""
+    coach_columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(coaches)")
+    }
+    for column in ("preferred_module", "style_tags"):
+        if column not in coach_columns:
+            conn.execute(f"ALTER TABLE coaches ADD COLUMN {column} TEXT")
+
+
 # Ordered, additive migrations keyed by the target `user_version` they bring a
 # database up to. `schema.sql` already reflects every migration's end state
 # (each callable is also idempotent), so these only matter for a database
@@ -191,6 +201,7 @@ def _add_player_stats_xg_columns(conn: sqlite3.Connection) -> None:
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (1, _add_roster_role_column),
     (1, _add_player_stats_xg_columns),
+    (2, _add_coach_style_columns),
 ]
 
 

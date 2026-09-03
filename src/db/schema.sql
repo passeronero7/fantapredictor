@@ -74,6 +74,8 @@ CREATE TABLE IF NOT EXISTS coaches (
     source_id         INTEGER REFERENCES sources(id),
     source_ref        TEXT,
     home_away         TEXT CHECK (home_away IS NULL OR home_away IN ('any','home','away')),
+    preferred_module  TEXT,                       -- e.g. '3-5-2', '4-2-3-1'
+    style_tags        TEXT,                       -- comma-separated tags
     notes             TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ux_coaches_name_dob

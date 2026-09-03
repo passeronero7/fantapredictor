@@ -34,10 +34,17 @@ def load(conn, path: str | Path) -> int:
             ).fetchone()
             if coach:
                 coach_id = int(coach["id"])
+                conn.execute(
+                    """UPDATE coaches SET preferred_module=COALESCE(?, preferred_module),
+                       style_tags=COALESCE(?, style_tags) WHERE id = ?""",
+                    (row.get("preferred_module"), row.get("style_tags"), coach_id),
+                )
             else:
                 coach_id = int(conn.execute(
-                    "INSERT INTO coaches (full_name, source_id, source_ref) VALUES (?, ?, ?)",
-                    (coach_name, sid, normalize_name(coach_name)),
+                    """INSERT INTO coaches (full_name, source_id, source_ref,
+                       preferred_module, style_tags) VALUES (?, ?, ?, ?, ?)""",
+                    (coach_name, sid, normalize_name(coach_name),
+                     row.get("preferred_module"), row.get("style_tags")),
                 ).lastrowid)
             conn.execute(
                 """INSERT INTO coach_club_seasons
