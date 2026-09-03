@@ -361,3 +361,14 @@ CREATE TABLE IF NOT EXISTS coach_season_stats (
     source_id     INTEGER REFERENCES sources(id),
     PRIMARY KEY (coach_id, club_id, season_id)
 );
+
+-- Human-readable read view: player/club/season labels inline.
+CREATE VIEW IF NOT EXISTS v_player_match_ratings AS
+SELECT r.id, s.name AS season, r.matchday, p.id AS player_id, p.full_name AS player,
+       c.name AS club, r.vote, r.fantavoto, r.goals, r.assists,
+       r.yellow_cards, r.red_cards, src.slug AS source
+FROM player_match_ratings AS r
+JOIN players AS p ON p.id = r.player_id
+JOIN clubs AS c ON c.id = r.club_id
+JOIN seasons AS s ON s.id = r.season_id
+JOIN sources AS src ON src.id = r.source_id;
