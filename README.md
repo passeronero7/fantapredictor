@@ -95,6 +95,30 @@ ingestor-compatible CSV and a provenance manifest under
 aggregate archive for a warehouse build. Refreshing an existing snapshot
 requires `--overwrite`.
 
+## Auction prediction strategy
+
+Auction selection rests on a transparent stack (see
+[the propensity study](docs/auction_propensity_forecast.md)):
+
+1. **Confirmed, priced roster** — only quotation-evidenced players pass the
+   release gates (`validate_release.py --require-priced`).
+2. **Propensity forecast** (`scripts/simulate_auction_propensity.py`) —
+   Monte Carlo of P(median vote >= 6.0) over a horizon, per player:
+   empirical-Bayes mark and appearance rates, bootstrap vote/bonus draws, and
+   a role-directional style multiplier from club attack/defense indices.
+3. **Coach conditioning** — curated per-club coach profiles (module + style
+   tags, schema v2) shift role propensities; back-three modules lift
+   defenders, pragmatic coaches lift goalkeepers.
+4. **Similar-player archetypes** — each estimate blends with the mean mark
+   propensity of his 20 nearest same-role historical player-seasons by per-90
+   technique signature (xG, xA, shots, key passes, xGChain/xGBuildup).
+5. **Baselines before the network** — until the SHASH model wins its
+   walk-forward gate, production predictions are labelled
+   global-median/expanding-prior quantiles.
+
+Treat propensity outputs as rankings, not calibrated probabilities: the
+2025/26 backtest shows a monotone but ~0.09-overconfident top bin.
+
 ## Player confidence baseline
 
 An explainable empirical-Bayes baseline ranks roster players using recent, open historical event data and your league's scoring weights. It reports potential and evidence confidence separately; see the [model documentation](docs/player_confidence_model.md).

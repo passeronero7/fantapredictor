@@ -50,6 +50,20 @@ python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
 python scripts/analyze_defenders.py
 ```
 
+## Prediction strategy rules
+
+- Auction propensity comes from `src/models/propensity.py`; keep the model
+  transparent (empirical distributions + shrinkage) and backtested before any
+  change to its estimates. Report propensity as a ranking metric: the
+  documented 2025/26 calibration is monotone but overconfident in the top bin.
+- Coach conditioning uses only curated `coach_club_seasons` rows with source
+  URLs; never fabricate coach modules or style tags.
+- The predict stage falls back to labelled global-median/expanding-prior
+  baselines whenever no model has passed the evaluation gate; never present
+  unapproved SHASH output as auction-ready.
+- Roster status is authoritative for every forecast: players outside the
+  confirmed pool are excluded even when ratings history exists.
+
 ## Data contract
 
 Roster records must contain: `player`, `club`, `role`, `status`, `source_url`, and `checked_at`. Valid `status` values are `confirmed`, `watchlist`, and `excluded`. A player can enter model or auction outputs only with `confirmed` status.
