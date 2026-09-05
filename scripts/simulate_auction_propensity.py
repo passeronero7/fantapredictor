@@ -162,7 +162,9 @@ def run_forecast(
         blended_rows = int(propensity["archetype_p"].notna().sum())
         print(f"Archetype blend applied to {blended_rows} players")
 
-    priced = attach_prices(propensity, repository.load_prices(conn, season))
+    prices_frame = repository.load_prices(conn, season)
+    prices_frame = prices_frame[prices_frame["fuori_lista"].fillna(0).eq(0)].copy()
+    priced = attach_prices(propensity, prices_frame)
     confirmed_keys = set(rosters["player_normalized"])
     priced = priced[priced["player_normalized"].isin(confirmed_keys)].copy()
     priced = priced[priced["price"].notna()].copy()
