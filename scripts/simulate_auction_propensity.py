@@ -12,6 +12,7 @@ the realised marks of baskets selected by propensity versus naive alternatives.
 from __future__ import annotations
 
 import argparse
+import re
 import json
 import sys
 from pathlib import Path
@@ -164,13 +165,38 @@ def run_forecast(
 
     prices_frame = repository.load_prices(conn, season)
     prices_frame = prices_frame[prices_frame["fuori_lista"].fillna(0).eq(0)].copy()
+    # Official probable-formations conditioning: titolars keep their
+    # appearance estimate; players absent from both the XI and the bench
+    # rotation get cut in half. Ballottaggio players keep 0.75.
+    formation_path = config.get_season_dir(season) / "coaches" / "probable_formations_2026_27.csv"
+    if formation_path.exists():
+        import re as _re
+        form = pd.read_csv(formation_path)
+        titolar_map: dict[str, float] = {}
+        for _, row in form.iterrows():
+            club = str(row["club"]).strip()
+            names = [n.strip() for n in _re.split(r"[;,]", str(row["titulars"]))]
+            for n in names:
+                titolar_map[n.lower()] = 1.0
+        status_map = titolar_map
+        def factor(row):
+            key = re.sub(r"[^a-z ]", "", str(row["player"]).lower()).strip()
+            for name, value in status_map.items():
+                fname = re.sub(r"[^a-z ]", "", name).strip()
+                if fname and (fname in key or key in fname):
+                    return value
+            return 0.6
+        propensity["formation_factor"] = propensity.apply(factor, axis=1)
+        boosted = int((propensity["formation_factor"] >= 1.0).sum())
+        print(f"formation conditioning: {boosted} titolars, others x0.6")
+        propensity["p_plays"] = (propensity["p_plays"] * propensity["formation_factor"]).clip(0, 1)
     priced = attach_prices(propensity, prices_frame)
     confirmed_keys = set(rosters["player_normalized"])
     priced = priced[priced["player_normalized"].isin(confirmed_keys)].copy()
     priced = priced[priced["price"].notna()].copy()
     if priced.empty:
         raise ValueError("No priced confirmed players available for the forecast")
-    config = SimulationConfig(
+    sim_config = SimulationConfig(
         from_matchday=from_matchday,
         matchdays=matchdays,
         simulations=simulations,
@@ -185,7 +211,7 @@ def run_forecast(
         priced = priced[priced["team"].isin(clubs)].copy()
     if len(clubs) % 2 != 0:
         raise ValueError(f"Club pairing needs an even club list, got {len(clubs)}")
-    result = simulate_horizon(priced, votes, style, clubs, config)
+    result = simulate_horizon(priced, votes, style, clubs, sim_config)
     result = result.merge(
         priced[["player_normalized", "price", "fvm"]], on="player_normalized", how="left"
     )
