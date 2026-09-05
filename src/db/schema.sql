@@ -372,3 +372,15 @@ JOIN players AS p ON p.id = r.player_id
 JOIN clubs AS c ON c.id = r.club_id
 JOIN seasons AS s ON s.id = r.season_id
 JOIN sources AS src ON src.id = r.source_id;
+
+-- SoFIFA/EA FC attribute snapshot (technique + attitude), one row per player.
+CREATE TABLE IF NOT EXISTS player_attributes (
+    player_id     INTEGER REFERENCES players(id) ON DELETE CASCADE,
+    snapshot      TEXT NOT NULL,                 -- e.g. 'eafc26'
+    overall       INTEGER,
+    position      TEXT,                          -- EA position (ST, CM, GK...)
+    technique     TEXT,                          -- JSON: finishing, passing...
+    attitude      TEXT,                          -- JSON: aggression, vision...
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (player_id, snapshot)
+);
