@@ -4,6 +4,11 @@
 
 ### Added
 
+- Official auction-data layer: league-list availability flags
+  (`fuori_lista`, 62 unselectable players), the official Statistico 2026/27
+  season aggregates (`fantacalcio_season_stats`, through MD3), and official
+  probable formations as an appearance conditioning feature (titolar x1.0 /
+  rotation x0.6, club-scoped name matching).
 - Auction propensity forecast (`src/models/propensity.py`,
   `scripts/simulate_auction_propensity.py`): Monte Carlo time-series of each
   priced confirmed player's propensity to hold a median good mark

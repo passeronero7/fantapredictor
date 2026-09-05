@@ -95,6 +95,27 @@ ingestor-compatible CSV and a provenance manifest under
 aggregate archive for a warehouse build. Refreshing an existing snapshot
 requires `--overwrite`.
 
+## Auction data sources (official layer)
+
+The auction pipeline now runs on an official-first data layer, ingested and
+committed in the private workspace:
+
+1. **League auction list** (Fantacalcio Leghe app export, `lista_ufficiale_*.xlsx`):
+   531 selectable + 62 `fuori lista` players. Flags live in
+   `player_prices.in_league_list` / `player_prices.fuori_lista`; the forecast
+   pool excludes unselectable players automatically.
+2. **Official Statistico 2026/27** (`fantacalcio_season_stats` table): 593
+   players through the latest completed matchday (media voto, fantamedia,
+   bonus/malus, penalties) — including live MD3 data.
+3. **Official probable formations** (`coaches/probable_formations_2026_27.csv`,
+   source: fantacalcio.it infographics, updated 3 September): titolars,
+   bench rotation, penalty takers, set-piece takers for all 20 clubs. The
+   propensity forecast conditions `p_plays` on titolar status (x1.0 titolar,
+   x0.6 absent from XI and rotation).
+4. **SoFIFA/EA FC attributes** (schema v4, `player_attributes`): 16k players
+   with technique + attitude JSON blobs; name-bridge to the roster pending
+   weight validation (never fused into scores untested).
+
 ## Auction prediction strategy
 
 Auction selection rests on a transparent stack (see

@@ -52,6 +52,13 @@ python scripts/analyze_defenders.py
 
 ## Prediction strategy rules
 
+- The official league auction list (Leghe app export) is authoritative over
+  the public quotazioni page for auction eligibility; the `fuori_lista` flag
+  must gate every auction-facing output.
+- Official probable formations condition appearance estimates; never present
+  bench players as starters without the formation discount.
+
+
 - Auction propensity comes from `src/models/propensity.py`; keep the model
   transparent (empirical distributions + shrinkage) and backtested before any
   change to its estimates. Report propensity as a ranking metric: the
