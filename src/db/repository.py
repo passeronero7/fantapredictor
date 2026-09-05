@@ -121,7 +121,8 @@ def load_prices(conn: sqlite3.Connection, season: str) -> pd.DataFrame:
         SELECT s.name AS season, p.full_name AS player,
                p.normalized_name AS player_normalized, pp.source_ref,
                c.name AS team, pp.role_classic, pp.role_mantra,
-               pp.price_initial, pp.price_current, pp.fvm
+               pp.price_initial, pp.price_current, pp.fvm,
+               pp.in_league_list, pp.fuori_lista
         FROM player_prices AS pp
         JOIN players AS p ON p.id = pp.player_id
         LEFT JOIN clubs AS c ON c.id = pp.club_id
