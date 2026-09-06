@@ -4,6 +4,22 @@
 
 ### Added
 
+- EAFC attribute bridge: surname-tail matching that prefers fantasy-
+  referenced identities, lifting roster coverage to 205 confirmed players;
+  an overeager orphan cleanup was recovered via the manifest rebuild path.
+- Attribute weight gate: point-biserial correlations of EAFC technique
+  attributes against realized 6.0+ marks on the MD1-3 sample came out
+  negative (selection bias on 132 player-matches), so the fusion weight is
+  held at 0 pending a stable positive signal at MD6-8.
+- Availability channel (schema v5 `availability_notes` + curated CSV with
+  official sources): proportional `p_plays` discount by expected return
+  date -- Yildiz/Ekhator drop to 0, McTominay to 0.39 for the MD4-11
+  horizon.
+- Recalibration: the documented -0.05 walk-forward offset is now applied
+  inside `player_propensity`, not just documented.
+
+### Added
+
 - Official auction-data layer: league-list availability flags
   (`fuori_lista`, 62 unselectable players), the official Statistico 2026/27
   season aggregates (`fantacalcio_season_stats`, through MD3), and official

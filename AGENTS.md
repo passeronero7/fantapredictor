@@ -52,6 +52,13 @@ python scripts/analyze_defenders.py
 
 ## Prediction strategy rules
 
+- External attribute datasets (EAFC/SoFIFA) enter the forecast only through
+  a statistically validated weight; negative or unstable correlations hold
+  the weight at 0. Identity bridges must prefer fantasy-referenced player
+  rows and never bulk-delete warehouse identities.
+- Long-term injuries enter the forecast through the availability channel
+  (proportional p_plays discount by expected return date, sourced rows
+  only).
 - The official league auction list (Leghe app export) is authoritative over
   the public quotazioni page for auction eligibility; the `fuori_lista` flag
   must gate every auction-facing output.

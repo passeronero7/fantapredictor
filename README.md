@@ -113,8 +113,12 @@ committed in the private workspace:
    propensity forecast conditions `p_plays` on titolar status (x1.0 titolar,
    x0.6 absent from XI and rotation).
 4. **SoFIFA/EA FC attributes** (schema v4, `player_attributes`): 16k players
-   with technique + attitude JSON blobs; name-bridge to the roster pending
-   weight validation (never fused into scores untested).
+   with technique + attitude JSON blobs; a surname-tail identity bridge
+   covers 205 roster players. The fusion weight is statistically gated and
+   currently held at 0 (negative correlations on the MD1-3 sample) until
+   MD6-8 confirms a stable positive signal.
+5. **Availability channel** (schema v5): curated injury rows with official
+   sources discount `p_plays` proportionally to the expected return date.
 
 ## Auction prediction strategy
 
