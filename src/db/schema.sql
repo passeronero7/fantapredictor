@@ -384,3 +384,15 @@ CREATE TABLE IF NOT EXISTS player_attributes (
     updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE (player_id, snapshot)
 );
+
+-- Availability channel: injury/suspension stops with expected return dates.
+CREATE TABLE IF NOT EXISTS availability_notes (
+    id             INTEGER PRIMARY KEY,
+    player_id      INTEGER REFERENCES players(id),
+    club           TEXT,
+    kind           TEXT NOT NULL CHECK (kind IN ('injury_short_term','injury_medium_term','injury_long_term','injury_evaluation','suspension','other')),
+    expected_return TEXT,
+    source_url     TEXT,
+    checked_at     TEXT,
+    UNIQUE (player_id, kind)
+);

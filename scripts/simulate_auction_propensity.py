@@ -190,6 +190,25 @@ def run_forecast(
         boosted = int((propensity["formation_factor"] >= 1.0).sum())
         print(f"formation conditioning: {boosted} titolars, others x0.6")
         propensity["p_plays"] = (propensity["p_plays"] * propensity["formation_factor"]).clip(0, 1)
+    # Availability channel: proportional p_plays discount by missed horizon.
+    from datetime import date as _date
+    from scripts.ingest_availability import horizon_factor
+    avail = pd.read_sql_query(
+        "SELECT p.normalized_name AS key, a.expected_return FROM availability_notes a "
+        "JOIN players p ON p.id = a.player_id", conn)
+    if not avail.empty:
+        horizon_start = _date.today()
+        horizon_days = matchdays * 7
+        factors = {
+            row["key"]: horizon_factor(row["expected_return"], horizon_start, horizon_days)
+            for _, row in avail.iterrows()
+        }
+        propensity["p_plays"] = [
+            round(p * factors.get(key, 1.0), 3)
+            for p, key in zip(propensity["p_plays"], propensity["player_normalized"])
+        ]
+        hit = {k: v for k, v in factors.items() if v < 1.0 and k in set(propensity["player_normalized"])}
+        print(f"availability discounts applied: {hit}")
     priced = attach_prices(propensity, prices_frame)
     confirmed_keys = set(rosters["player_normalized"])
     priced = priced[priced["player_normalized"].isin(confirmed_keys)].copy()

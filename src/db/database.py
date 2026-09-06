@@ -17,7 +17,7 @@ SCHEMA_FILE = Path(__file__).parent / "schema.sql"
 # migration below has been applied. Bump this whenever a new migration is
 # appended; `schema.sql` itself always reflects the fully-migrated shape, so a
 # freshly created database goes straight to the current version.
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 5
 
 # Sources are registered once, keyed by slug. `licence` is a human-readable
 # summary of the terms we are relying on; every row lands in the `sources`
@@ -212,6 +212,16 @@ def _add_attribute_table(conn: sqlite3.Connection) -> None:
             conn.executescript(statement + ";")
 
 
+
+
+def _add_availability_table(conn: sqlite3.Connection) -> None:
+    from pathlib import Path as _Path
+    schema = _Path(__file__).parent / "schema.sql"
+    for statement in schema.read_text(encoding="utf-8").split(";"):
+        if "CREATE TABLE IF NOT EXISTS availability_notes" in statement:
+            conn.executescript(statement + ";")
+
+
 # Ordered, additive migrations keyed by the target `user_version` they bring a
 # database up to. `schema.sql` already reflects every migration's end state
 # (each callable is also idempotent), so these only matter for a database
@@ -224,6 +234,7 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (2, _add_coach_style_columns),
     (3, _add_readable_views),
     (4, _add_attribute_table),
+    (5, _add_availability_table),
 ]
 
 
