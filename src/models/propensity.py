@@ -31,6 +31,10 @@ from src.db.ingestors.common import season_label
 
 GOOD_VOTE_THRESHOLD = 6.0
 SHRINKAGE_OBSERVATIONS = 3.0
+# Documented walk-forward calibration (2025/26, cutoffs 10/20/30): the top
+# bins overestimate realized rates by ~0.05-0.11. A conservative downward
+# shift until more windows are evaluated.
+RECALIBRATION_OFFSET = -0.05
 STYLE_MULTIPLIER_CAP = (0.5, 2.0)
 
 
@@ -195,8 +199,9 @@ def player_propensity(
     # Empirical-Bayes shrinkage toward the role prior.
     role_marks = profile["role"].map(role_prior_mark)
     profile["p_good_mark"] = (
-        profile["good_marks"] + shrinkage * role_marks
-    ) / (profile["appearances"] + shrinkage)
+        (profile["good_marks"] + shrinkage * role_marks)
+        / (profile["appearances"] + shrinkage)
+    ) + RECALIBRATION_OFFSET
     role_appearance_prior = profile.groupby("role")["appearance_rate_raw"].mean()
     profile["p_plays"] = (
         profile["appearances"] + shrinkage * profile["role"].map(role_appearance_prior) * 4

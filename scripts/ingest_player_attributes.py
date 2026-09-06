@@ -8,6 +8,7 @@ sys.path.insert(0, str(ROOT))
 from config.settings import config
 from src.db import database
 from src.db.ingestors.common import player_id, start_run, finish_run, source_id
+from src.data_processing.prices_processor import _surname_tail
 from src.utils.name_matching import normalize_name
 
 TECHNIQUE = ["Finishing","Shot Power","Long Shots","Volleys","Penalties","Vision","Crossing",
@@ -15,6 +16,41 @@ TECHNIQUE = ["Finishing","Shot Power","Long Shots","Volleys","Penalties","Vision
              "Balance","Reactions","Ball Control","Composure","Interceptions","Heading Accuracy",
              "Def Awareness","Standing Tackle","Sliding Tackle","Jumping","Stamina","Strength"]
 ATTITUDE = ["Aggression","Positioning","Vision","Composure","Reactions"]
+
+def _match_player(conn, name: str):
+    """Exact normalized match first, then a unique surname-tail match."""
+    from src.utils.name_matching import normalize_name
+    normalized = normalize_name(name)
+    exact = conn.execute(
+        "SELECT id FROM players WHERE normalized_name = ? LIMIT 1", (normalized,)
+    ).fetchone()
+    if exact:
+        return int(exact["id"])
+    tail = _surname_tail(name)
+    if not tail:
+        return None
+    candidates = [
+        int(row["id"]) for row in conn.execute("SELECT id, normalized_name FROM players")
+        if _surname_tail(row["normalized_name"]) == tail
+    ]
+    if len(candidates) == 1:
+        return candidates[0]
+    if len(candidates) > 1:
+        # Prefer the candidate referenced by roster/ratings/prices: the
+        # fantasy-relevant identity, not an ingest orphan.
+        referenced = [
+            pid for pid in candidates
+            if conn.execute(
+                "SELECT 1 FROM roster_memberships WHERE player_id=? UNION ALL "
+                "SELECT 1 FROM player_match_ratings WHERE player_id=? UNION ALL "
+                "SELECT 1 FROM player_prices WHERE player_id=? LIMIT 1",
+                (pid, pid, pid),
+            ).fetchone()
+        ]
+        if len(referenced) == 1:
+            return referenced[0]
+    return None
+
 
 def load(conn, path, snapshot="eafc26") -> int:
     frame = pd.read_csv(path)
@@ -25,7 +61,9 @@ def load(conn, path, snapshot="eafc26") -> int:
             name = str(row.get("Name", "")).strip()
             if not name:
                 continue
-            pid = player_id(conn, name, "leaf-node-manual")
+            pid = _match_player(conn, name)
+            if pid is None:
+                continue
             technique = {k: row.get(k) for k in TECHNIQUE if pd.notna(row.get(k))}
             attitude = {k: row.get(k) for k in ATTITUDE if pd.notna(row.get(k))}
             conn.execute(
