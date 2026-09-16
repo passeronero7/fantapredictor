@@ -5,6 +5,15 @@ from src.data_processing.votes_processor import VotesProcessor
 
 
 class VotesProcessorTests(unittest.TestCase):
+    def test_current_and_historical_urls_retain_ids_and_missing_grades(self):
+        import math
+        for href in ['/serie-a/squadre/roma/test/123','/serie-a/squadre/roma/test/123/2024-25']:
+            html=f'<table><tr><th>Roma</th></tr><tr><td><a class="player-name" href="{href}">Test</a></td></tr></table>'
+            row=VotesProcessor.parse_matchday_html(html).iloc[0]
+            self.assertEqual(row['id'],'123')
+            self.assertTrue(math.isnan(row.vote))
+            self.assertTrue(math.isnan(row.fantavoto))
+
     def test_parse_vote_file_cleans_and_standardizes_columns(self):
         with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False) as tmp:
             tmp.write(

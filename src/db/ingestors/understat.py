@@ -56,6 +56,14 @@ def load(conn, path: str | Path, league: str = "Serie_A") -> int:
                 "red_cards": row.get("red_cards"),
             }
             source_ref = str(row.get("id", ""))
+            # A league-season aggregate spans all clubs in team_title. When
+            # roster reconciliation changes its destination, replace only
+            # obsolete attributions of this exact provider/season/player row.
+            # Keeping them would count the same cumulative totals twice.
+            conn.execute(
+                'DELETE FROM player_season_stats WHERE season_id=? AND source_id=? AND source_ref=? AND club_id IS NOT ?',
+                (season_id, sid, source_ref, cid),
+            )
             existing = conn.execute(
                 """SELECT id FROM player_season_stats
                    WHERE player_id = ? AND season_id = ? AND club_id IS ?
@@ -162,6 +170,9 @@ def load_matches(conn, path: str | Path, league: str = "Serie_A") -> int:
                 "SELECT id FROM matches WHERE source_id = ? AND source_match_id = ?",
                 (sid, source_ref),
             ).fetchone()["id"])
+            if integer(row.get("home_goals")) is None or integer(row.get("away_goals")) is None:
+                loaded += 1
+                continue
             for cid, side, xg in (
                 (home_id, "home", number(row.get("home_xg"))),
                 (away_id, "away", number(row.get("away_xg"))),

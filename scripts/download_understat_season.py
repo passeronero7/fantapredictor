@@ -69,7 +69,7 @@ def build_frame(players: list[dict], season: int, checked_at: str) -> pd.DataFra
     return frame
 
 
-def build_match_frame(dates: list[dict], season: int, checked_at: str) -> pd.DataFrame:
+def build_match_frame(dates: list[dict], season: int, checked_at: str, include_future: bool = False) -> pd.DataFrame:
     """Normalize completed league fixtures with scores, xG, and matchdays."""
     club_ids = {
         str(side.get("id"))
@@ -83,7 +83,7 @@ def build_match_frame(dates: list[dict], season: int, checked_at: str) -> pd.Dat
 
     records = []
     for index, match in enumerate(dates):
-        if not match.get("isResult"):
+        if not match.get("isResult") and not include_future:
             continue
         home = match.get("h", {})
         away = match.get("a", {})
@@ -116,13 +116,14 @@ def main() -> None:
     parser.add_argument("--season", type=int, default=2026, help="start year, e.g. 2026")
     parser.add_argument("--league", default="Serie_A")
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--include-future", action="store_true", help="Include scheduled fixtures with null scores")
     args = parser.parse_args()
 
     checked_at = datetime.now(UTC).isoformat()
     with requests.Session() as session:
         payload, source_url = fetch_league_data(session, args.league, args.season)
     frame = build_frame(payload["players"], args.season, checked_at)
-    matches = build_match_frame(payload["dates"], args.season, checked_at)
+    matches = build_match_frame(payload["dates"], args.season, checked_at, args.include_future)
     output = args.output or (
         config.get_season_dir(f"{args.season % 100:02d}{(args.season + 1) % 100:02d}") /
         "raw" / f"understat_serie_a_{args.season}_season.csv"

@@ -12,6 +12,9 @@ from src.db.ingestors.common import club_id, finish_run, player_id, season_label
 def load(conn, path: str | Path, season: str) -> int:
     """Load classic auction quotations and FVM values."""
     frame = pd.read_csv(path)
+    for flag in ('in_league_list', 'fuori_lista'):
+        if flag in frame and not frame[flag].isin([0, 1]).all():
+            raise ValueError(f'{flag} must contain only explicit 0/1 values')
     run_id, _ = start_run(conn, "fantacalcio")
     season_id = _season_id(conn, season_label(season))
     sid = source_id(conn, "fantacalcio")
@@ -36,6 +39,12 @@ def load(conn, path: str | Path, season: str) -> int:
                  row.get("price_initial"), row.get("price_current"), row.get("fvm"), sid,
                  row.get("source_ref")),
             )
+            for flag in ('in_league_list', 'fuori_lista'):
+                if flag in frame:
+                    conn.execute(
+                        f'UPDATE player_prices SET {flag}=? WHERE season_id=? AND player_id=? AND source_id=?',
+                        (int(row[flag]), season_id, pid, sid),
+                    )
             loaded += 1
         finish_run(conn, run_id, "ok", loaded)
         conn.commit()

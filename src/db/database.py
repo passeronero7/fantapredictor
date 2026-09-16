@@ -17,7 +17,7 @@ SCHEMA_FILE = Path(__file__).parent / "schema.sql"
 # migration below has been applied. Bump this whenever a new migration is
 # appended; `schema.sql` itself always reflects the fully-migrated shape, so a
 # freshly created database goes straight to the current version.
-CURRENT_SCHEMA_VERSION = 5
+CURRENT_SCHEMA_VERSION = 6
 
 # Sources are registered once, keyed by slug. `licence` is a human-readable
 # summary of the terms we are relying on; every row lands in the `sources`
@@ -228,6 +228,13 @@ def _add_availability_table(conn: sqlite3.Connection) -> None:
 # created by an older core version whose `user_version` hasn't reached the
 # target yet -- including every pre-existing database, since `user_version`
 # was never stamped before this version-tracking was added.
+def _add_auction_eligibility(conn: sqlite3.Connection) -> None:
+    columns = {r['name'] for r in conn.execute('PRAGMA table_info(player_prices)')}
+    for name, default in [('in_league_list', 0), ('fuori_lista', 1)]:
+        if name not in columns:
+            conn.execute(f'ALTER TABLE player_prices ADD COLUMN {name} INTEGER NOT NULL DEFAULT {default} CHECK ({name} IN (0,1))')
+
+
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (1, _add_roster_role_column),
     (1, _add_player_stats_xg_columns),
@@ -235,6 +242,7 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (3, _add_readable_views),
     (4, _add_attribute_table),
     (5, _add_availability_table),
+    (6, _add_auction_eligibility),
 ]
 
 

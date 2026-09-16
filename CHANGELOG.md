@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### September 16 data refresh and auction preparation
+
+- Add a reproducible download → offline ingestion → Excel/CSV dossier flow
+  for the active season, with source URLs, retrieval times and checksums.
+- Refresh 380 fixtures (40 completed), 1,274 observed Fantacalcio ratings,
+  437 Understat aggregates, 6,545 provider summary metrics and 20 probable
+  formations. The private 8-manager/500-credit dossier preserves league-list
+  eligibility, source gaps and uncertain availability.
+- Schema v6 / package 0.8.0 implements missing `in_league_list` and
+  `fuori_lista` columns. Unknown eligibility is excluded; public price
+  refreshes preserve previously asserted league flags.
+- Bridge unambiguous Understat identities by current club, full name tokens,
+  explicit initials and goalkeeper role, without deleting player identities.
+  Replace only stale club attributions of the same provider-season aggregate.
+- Prevent future fixtures and duplicate provider match rows from inflating
+  observed team appearance counts. Support canonical club names and excluded
+  players in the priced roster validation gate.
+- Parse official player IDs from both current and historical vote URLs;
+  consolidate only superseded observations whose old source reference lacked
+  an ID. Missing HTML grades remain missing. Preserve discrepancies between
+  provider season summaries and individual matchday marks in a workbook sheet.
+- Budget scenarios reserve 1 credit per league slot and 10 per manager;
+  workbook instructions clearly label assumptions and unvalidated price
+  references. Exact recovery dates are not invented from vague injury notes.
+
 ### Added
 
 - EAFC attribute bridge: surname-tail matching that prefers fantasy-

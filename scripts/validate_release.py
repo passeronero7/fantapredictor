@@ -99,6 +99,10 @@ def priced_confirmed_role_counts(
 
     roster = pd.read_csv(roster_path)
     prices = pd.read_csv(prices_path)
+    if 'fuori_lista' in prices:
+        prices = prices[prices.fuori_lista.eq(0)].reset_index(drop=True)
+    if 'in_league_list' in prices:
+        prices = prices[prices.in_league_list.eq(1)].reset_index(drop=True)
     matches = match_prices_to_roster(roster, prices)
     confirmed_indexes = set(roster.index[roster["status"].astype(str).str.strip().eq("confirmed")])
     priced_indexes = {

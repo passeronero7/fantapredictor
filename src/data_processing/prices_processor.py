@@ -108,7 +108,8 @@ def match_prices_to_roster(
     claimed: dict[int, int] = {}
     for price_index, price_row in prices.iterrows():
         club = str(price_row.get("team", "")).strip().upper()
-        club_name = FANTACALCIO_TEAM_CODES.get(club)
+        canonical_names = {name.upper(): name for name in FANTACALCIO_TEAM_CODES.values()}
+        club_name = FANTACALCIO_TEAM_CODES.get(club, canonical_names.get(club))
         if club_name is None:
             continue
         candidates = roster_by_club.get(club_name, [])

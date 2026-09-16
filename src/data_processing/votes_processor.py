@@ -242,7 +242,7 @@ class VotesProcessor:
                     continue
                 player_name = player_elem.get_text(strip=True)
                 player_href = player_elem.get("href", "")
-                player_id = re.search(r"/(\d+)/(?:\d{4}-\d{2})/?$", player_href)
+                player_id = re.search(r"/(\d+)(?:/\d{4}-\d{2})?/?$", player_href)
                 role_elem = row.find("span", class_="role")
                 role = role_elem.get("data-value", "").upper() if role_elem else "C"
 
@@ -252,17 +252,17 @@ class VotesProcessor:
                 # The public page exposes three pairs in this order:
                 # editorial Fantacalcio, statistical, and Voto Italia.
                 vote_values = [
-                    cls._clean_grade(span.get("data-value", ""), default=6.0)
+                    cls._clean_grade(span.get("data-value", ""))
                     for span in grades[:3]
                 ]
                 fanta_values = [
-                    cls._clean_grade(span.get("data-value", ""), default=6.0)
+                    cls._clean_grade(span.get("data-value", ""))
                     for span in fanta_grades[:3]
                 ]
                 while len(vote_values) < 3:
-                    vote_values.append(6.0)
+                    vote_values.append(float('nan'))
                 while len(fanta_values) < 3:
-                    fanta_values.append(vote_values[len(fanta_values)])
+                    fanta_values.append(float('nan'))
 
                 vote = vote_values[0]
                 fantavoto = fanta_values[0]

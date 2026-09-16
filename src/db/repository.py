@@ -146,13 +146,13 @@ def load_team_match_stats(
     source provided (shots, corners, cards, possession, xG). Missing
     statistics stay ``NaN`` -- sources cover different eras.
     """
-    where = ""
+    where = "WHERE m.home_goals IS NOT NULL AND m.away_goals IS NOT NULL"
     params: tuple[object, ...] = ()
     if through_season is not None:
         cutoff_year = int(season_label(through_season).split("/", 1)[0])
-        where = "WHERE s.start_year <= ?"
+        where += " AND s.start_year <= ?"
         params = (cutoff_year,)
-    return pd.read_sql_query(
+    frame = pd.read_sql_query(
         f"""
         SELECT s.name AS season, m.matchday, m.match_date,
                c.name AS team, opp.name AS opponent,
@@ -173,6 +173,13 @@ def load_team_match_stats(
         conn,
         params=params,
     )
+    # Providers may describe the same fixture. Count each club appearance once,
+    # preferring observed shot statistics over xG-only team rows.
+    frame['_richness'] = frame[['shots', 'shots_on_target', 'corners', 'fouls']].notna().sum(axis=1)
+    return (frame.sort_values('_richness', ascending=False, kind='stable')
+            .drop_duplicates(['season', 'matchday', 'team', 'opponent', 'is_home'])
+            .drop(columns='_richness').sort_values(['season', 'matchday', 'team'])
+            .reset_index(drop=True))
 
 
 def load_player_skill_stats(conn: sqlite3.Connection, season: str) -> pd.DataFrame:

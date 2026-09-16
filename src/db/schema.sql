@@ -271,6 +271,8 @@ CREATE TABLE IF NOT EXISTS player_prices (
     price_initial    REAL,
     price_current   REAL,
     fvm              REAL,
+    in_league_list   INTEGER NOT NULL DEFAULT 0 CHECK (in_league_list IN (0,1)),
+    fuori_lista      INTEGER NOT NULL DEFAULT 1 CHECK (fuori_lista IN (0,1)),
     source_id        INTEGER NOT NULL REFERENCES sources(id),
     source_ref       TEXT,
     updated_at       TEXT NOT NULL DEFAULT (datetime('now')),

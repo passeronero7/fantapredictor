@@ -6,6 +6,7 @@ from pathlib import Path
 
 from src.data_processing.votes_processor import VotesProcessor
 from src.db.ingestors.common import club_id, finish_run, player_id, season_label, source_id, start_run
+from src.utils.name_matching import normalize_name
 
 
 def load(conn, directory: str | Path, season: str) -> int:
@@ -29,6 +30,18 @@ def load(conn, directory: str | Path, season: str) -> int:
                 continue
             pid = player_id(conn, name, "fantacalcio", row.get("id"), row.get("role"))
             cid = club_id(conn, team, "fantacalcio")
+            # Older HTML parsers missed IDs on modern player URLs. Remove only
+            # the superseded same-name/club/day row if its identity has no
+            # provider alias, or its observation explicitly lacked an ID.
+            # Preserve observations which already carry a distinct source ID.
+            if row.get('id') is not None and str(row['id']).lower() not in {'nan','none',''}:
+                conn.execute('''DELETE FROM player_match_ratings WHERE season_id=? AND matchday=?
+                    AND club_id=? AND source_id=? AND player_id IN
+                    (SELECT p.id FROM players p WHERE p.normalized_name=? AND p.id!=?
+                     AND (NOT EXISTS(SELECT 1 FROM player_aliases a WHERE a.player_id=p.id AND a.source_id=?)
+                          OR player_match_ratings.source_ref IN (?,?,?)))''',
+                    (season_id,matchday,cid,sid,normalize_name(name),pid,sid,
+                     f'{season}:{matchday}:nan',f'{season}:{matchday}:None',f'{season}:{matchday}:{name}'))
             conn.execute(
                 """INSERT INTO player_match_ratings
                    (season_id, matchday, player_id, club_id, vote, fantavoto,
