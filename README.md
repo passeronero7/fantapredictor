@@ -4,16 +4,19 @@ An evidence-led probabilistic prediction and research engine for Serie A Fantaca
 
 ## Current state
 
-The 16 September 2026 refresh is documented in
+The 19 September 2026 refresh is documented in
 [`docs/auction_refresh.md`](docs/auction_refresh.md). The private warehouse
-now has all 380 scheduled fixtures (40 completed), 1,274 observed ratings
-through matchday 4, 437 Understat aggregates, 595 current quotations and
-531 eligible players under the supplied league list. The Excel dossier
-includes 20-club coverage, observed per-90 metrics, availability and two
-8-manager/500-credit budget scenarios. These are transparent planning
-references, not approved neural predictions. Schema v6 / package 0.8.0
-adds the previously missing auction eligibility fields, with fail-closed
-defaults. Older snapshot counts elsewhere in the docs are historical.
+now has all 380 scheduled fixtures (41 completed: matchdays 1-4 plus the
+Friday opener of matchday 5), 1,274 observed ratings through matchday 4
+(matchday 5 was in progress at snapshot time and its votes are not ingested),
+439 Understat aggregates, 597 current quotations, matchday-5 probable XIs,
+55 availability notices and 531 eligible players under the supplied
+5 September league list. The Excel dossier includes 20-club coverage,
+observed per-90 metrics, availability and two 8-manager/500-credit budget
+scenarios. These are transparent planning references, not approved neural
+predictions. Schema v6 / package 0.8.0 adds the previously missing auction
+eligibility fields, with fail-closed defaults. Older snapshot counts
+elsewhere in the docs are historical.
 
 The codebase implements:
 - FBref manual-export validation and utility modules (`src/data_processing/`, `src/utils/`).

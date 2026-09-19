@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### September 19 data refresh (pre-matchday 5)
+
+- Re-run the documented download → offline ingestion → dossier flow into a
+  new dated snapshot (`refresh_2026_09_19`), after a SQLite backup and a
+  copy of the season directory. Matchday 5 was in progress (only
+  Monza-Sassuolo played), so votes were fetched through matchday 4 only.
+- Warehouse now holds 41 completed fixtures, 439 Understat aggregates
+  (417 bridged), 597 quotations (two new `fuori_lista` rows: Lovric,
+  Esteban), 6,567 summary metrics, matchday-5 probable XIs and 55 current
+  availability notices; 531 eligible players and 1,274 ratings unchanged.
+  Release gates (`--require-confirmed --require-lineup --require-priced`),
+  integrity and foreign-key checks pass. Dated refresh, quality and
+  checksum manifests were written alongside the 8-manager dossier.
+
 ### September 16 data refresh and auction preparation
 
 - Add a reproducible download → offline ingestion → Excel/CSV dossier flow

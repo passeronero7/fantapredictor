@@ -1,10 +1,26 @@
 # Serie A refresh and 8-manager auction dossier
 
-The 16 September 2026 private snapshot supersedes the earlier September
-counts. It contains 40 completed fixtures, the 380-fixture calendar, 1,274
-observed Fantacalcio ratings across four complete matchdays, 437 Understat
-player-season aggregates, 595 public quotations, 6,545 Fantacalcio summary
-metrics, probable XIs for all 20 clubs and 61 availability notices.
+The 19 September 2026 private snapshot (`refresh_2026_09_19`, acquired at
+00:03 UTC) supersedes the 16 September one. It contains 41 completed
+fixtures (matchdays 1-4 plus Monza-Sassuolo 2-1, the Friday opener of
+matchday 5), the 380-fixture calendar, 1,274 observed Fantacalcio ratings
+across four complete matchdays, 439 Understat player-season aggregates
+(417 bridged to provider identities), 597 public quotations, 6,567
+Fantacalcio summary metrics, matchday-5 probable XIs for all 20 clubs and
+55 availability notices. Matchday 5 was in progress at snapshot time
+(votes published for two clubs only), so the downloader was run with
+`--last-matchday 4`; its votes are deliberately absent and the provider's
+season summary already includes the Monza/Sassuolo marks, which is why the
+dossier's `Discrepanze_fonte` sheet grew from 92 to 115 rows.
+
+Compared with 16 September: two public quotation rows were added
+(Lovric/Udinese, Esteban/Lecce), both outside the 5 September league list
+and therefore `fuori_lista`; no club or Classic-role changes; FVM moved
+for two players (Mastantuono 39→70, De Bruyne 103→97); eight players left
+the availability page and two entered it (Spinazzola/Napoli, Terzic/
+Frosinone); six clubs changed their probable XI or module. Results from
+16 September (40 completed fixtures, 437 aggregates, 595 quotations, 61
+notices) are retained in `data/backups/refresh_2026_09_19/`.
 
 The supplied league XLSX remains authoritative for eligibility and Classic
 roles. Its snapshot date is 5 September: 531 players are eligible, 62 are
@@ -22,17 +38,17 @@ attributes and manually curated sources.
 
 ```bash
 python scripts/download_auction_snapshot.py \
-  --snapshot /path/to/workspace/data/season_2026_27/raw/refresh_2026_09_16 \
+  --snapshot /path/to/workspace/data/season_2026_27/raw/refresh_2026_09_19 \
   --last-matchday 4
 
 python scripts/prepare_auction_snapshot.py \
-  --snapshot /path/to/workspace/data/season_2026_27/raw/refresh_2026_09_16 \
+  --snapshot /path/to/workspace/data/season_2026_27/raw/refresh_2026_09_19 \
   --league-list /path/to/league_export.xlsx \
   --data-dir /path/to/workspace/data \
   --checked-at <checked_at-from-acquisition_manifest.json>
 
 python scripts/build_auction_dossier.py \
-  --data-dir /path/to/workspace/data --as-of 2026-09-16
+  --data-dir /path/to/workspace/data --as-of 2026-09-19
 ```
 
 Use a new dated directory for the next refresh. Increase `--last-matchday`
@@ -102,7 +118,9 @@ not an asserted official future-fixture feed.
 
 The requested “Saturday 25” is unresolved: 25 September 2026 is Friday,
 Saturday is 26 September. No exact auction date or defence-modifier rule is
-silently recorded as confirmed. Refresh after G5 and again before the auction.
+silently recorded as confirmed. Refresh again once G5 is complete (last
+fixture Milan-Lecce, Sunday 20 September) with `--last-matchday 5`, and
+again before the auction.
 
 ## Validation
 
