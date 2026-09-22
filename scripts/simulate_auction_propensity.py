@@ -15,6 +15,7 @@ import argparse
 import re
 import json
 import sys
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -63,6 +64,7 @@ def run_forecast(
     simulations: int,
     good_mark: float,
     seed: int,
+    as_of: "date | None" = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     from src.db.ingestors.common import season_label
 
@@ -191,24 +193,32 @@ def run_forecast(
         print(f"formation conditioning: {boosted} titolars, others x0.6")
         propensity["p_plays"] = (propensity["p_plays"] * propensity["formation_factor"]).clip(0, 1)
     # Availability channel: proportional p_plays discount by missed horizon.
-    from datetime import date as _date
     from scripts.ingest_availability import horizon_factor
     avail = pd.read_sql_query(
         "SELECT p.normalized_name AS key, a.expected_return FROM availability_notes a "
         "JOIN players p ON p.id = a.player_id", conn)
+    horizon_start = as_of or date.today()
+    propensity["availability_structured"] = False
     if not avail.empty:
-        horizon_start = _date.today()
         horizon_days = matchdays * 7
+        # A row only counts as "structured" when it carries a real date: most
+        # availability rows are sourced from vague free text ("da fine
+        # novembre") and are deliberately left undated rather than invented,
+        # so horizon_factor correctly falls back to 1.0 for them. Marking
+        # those as structured would wrongly suppress the note-based fallback
+        # discount downstream (see optimize_auction_roster.py::build_pool).
+        dated = avail[avail["expected_return"].notna()]
         factors = {
             row["key"]: horizon_factor(row["expected_return"], horizon_start, horizon_days)
-            for _, row in avail.iterrows()
+            for _, row in dated.iterrows()
         }
         propensity["p_plays"] = [
             round(p * factors.get(key, 1.0), 3)
             for p, key in zip(propensity["p_plays"], propensity["player_normalized"])
         ]
+        propensity["availability_structured"] = propensity["player_normalized"].isin(factors)
         hit = {k: v for k, v in factors.items() if v < 1.0 and k in set(propensity["player_normalized"])}
-        print(f"availability discounts applied: {hit}")
+        print(f"availability discounts applied (as of {horizon_start.isoformat()}): {hit}")
     priced = attach_prices(propensity, prices_frame)
     confirmed_keys = set(rosters["player_normalized"])
     priced = priced[priced["player_normalized"].isin(confirmed_keys)].copy()
@@ -232,8 +242,10 @@ def run_forecast(
         raise ValueError(f"Club pairing needs an even club list, got {len(clubs)}")
     result = simulate_horizon(priced, votes, style, clubs, sim_config)
     result = result.merge(
-        priced[["player_normalized", "price", "fvm"]], on="player_normalized", how="left"
+        priced[["player_normalized", "price", "fvm", "availability_structured"]],
+        on="player_normalized", how="left",
     )
+    result["availability_structured"] = result["availability_structured"].fillna(False)
     result["expected_good_marks"] = (
         result["p_plays"].fillna(0.0) * result["simulated_mark_rate"]
     )
@@ -253,8 +265,12 @@ def main() -> None:
     parser.add_argument("--cutoffs", default="10,20,30", help="Backtest cutoffs")
     parser.add_argument("--window", type=int, default=10, help="Backtest evaluation window")
     parser.add_argument("--seed", type=int, default=20260903)
+    parser.add_argument("--as-of", type=str, default=None,
+                         help="Availability horizon reference date (ISO); defaults to today, "
+                              "which makes the run non-reproducible across days")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    as_of = date.fromisoformat(args.as_of) if args.as_of else None
 
     conn = database.get_connection(args.db)
     try:
@@ -276,7 +292,7 @@ def main() -> None:
 
         result, style = run_forecast(
             conn, args.season, args.from_matchday, args.matchdays,
-            args.simulations, args.good_mark, args.seed,
+            args.simulations, args.good_mark, args.seed, as_of=as_of,
         )
     finally:
         conn.close()

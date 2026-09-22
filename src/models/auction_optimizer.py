@@ -27,6 +27,7 @@ DEPTH_WEIGHTS = {
 @dataclass(frozen=True)
 class AuctionOptimizationConfig:
     budget: int = 500
+    reserve: int = 0
     defence_modifier: bool = False
     reliability_weight: float = 0.25
 
@@ -64,14 +65,19 @@ def optimize_auction_roster(
     if missing:
         raise ValueError(f"Missing optimizer columns: {', '.join(sorted(missing))}")
 
-    frame = players.copy().reset_index(drop=True)
+    frame = players.copy()
     frame["role"] = frame["role"].astype(str).str.upper().str.strip()
     frame["auction_cost"] = pd.to_numeric(frame["auction_cost"], errors="coerce")
+    # Filter before reindexing: resetting the index first and filtering after
+    # left gaps in frame.index while every downstream row-position lookup
+    # (offset + player_index, frame.loc[player_index]) assumed a dense
+    # range(len(frame)) index, causing out-of-bounds writes into the
+    # constraint matrix whenever any row was dropped here.
     frame = frame[
         frame["role"].isin(ROSTER_SLOTS)
         & frame["auction_cost"].notna()
         & frame["auction_cost"].ge(1)
-    ].copy()
+    ].copy().reset_index(drop=True)
     if frame["player"].duplicated().any():
         raise ValueError("Player names must be unique in the eligible pool")
     for role, count in ROSTER_SLOTS.items():
@@ -122,7 +128,8 @@ def optimize_auction_roster(
                 matrix[offset + player_index, variable] = 1.0
         upper[offset + player_index] = 1.0
     matrix[-1, :] = costs
-    upper[-1] = float(config.budget)
+    spendable = float(config.budget - config.reserve)
+    upper[-1] = spendable
 
     solution = milp(
         c=objective,
@@ -150,12 +157,13 @@ def optimize_auction_roster(
     if counts != ROSTER_SLOTS or selected["player"].duplicated().any():
         raise RuntimeError("Solver returned an invalid roster")
     total_cost = int(round(selected["auction_cost"].sum()))
-    if total_cost > config.budget:
+    if total_cost > spendable:
         raise RuntimeError("Solver returned an over-budget roster")
     return {
         "roster": selected.reset_index(drop=True),
         "total_cost": total_cost,
         "budget": config.budget,
+        "reserve": config.reserve,
         "budget_remaining": config.budget - total_cost,
         "objective": float(selected["weighted_utility"].sum()),
         "defence_modifier": config.defence_modifier,

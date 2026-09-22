@@ -101,10 +101,15 @@ top 15 as the Inter back-three benefit materialises.
 
 ## Reproduce
 
+Pass `--as-of YYYY-MM-DD` to fix the availability-horizon reference date; it
+defaults to the run date, which makes the injury discount (and therefore the
+ranking) shift from one day to the next even with identical inputs.
+
 ```bash
 export FANTAPREDICTOR_DATA_DIR=/path/to/fantapredictor-workspace/data
 python scripts/simulate_auction_propensity.py --mode forecast \
-  --season 2627 --from-matchday 3 --matchdays 8 --simulations 1000
+  --season 2627 --from-matchday 3 --matchdays 8 --simulations 1000 \
+  --as-of 2026-09-23
 python scripts/simulate_auction_propensity.py --mode backtest \
   --season 2025-26 --cutoffs 10,20,30 --window 10
 ```

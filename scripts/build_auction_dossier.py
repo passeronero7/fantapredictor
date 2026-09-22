@@ -45,7 +45,8 @@ def build(data_dir: Path, as_of: str):
     out.mkdir(parents=True,exist_ok=True)
     conn = database.get_connection(data_dir/'fantapredictor.db')
     season_id = conn.execute("SELECT id FROM seasons WHERE name='2026/27'").fetchone()[0]
-    frame = pd.read_sql_query('''SELECT pp.player_id,pp.source_ref,p.full_name player,c.name club,
+    frame = pd.read_sql_query('''SELECT pp.player_id,pp.source_ref,p.full_name player,
+        p.normalized_name player_normalized,c.name club,
         pp.role_classic role,pp.price_current quotazione,pp.fvm,pp.in_league_list,pp.fuori_lista,
         EXISTS(SELECT 1 FROM roster_memberships r WHERE r.player_id=pp.player_id AND r.club_id=pp.club_id
           AND r.season_id=pp.season_id AND r.status='confirmed') confirmed

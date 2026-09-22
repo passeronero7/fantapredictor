@@ -75,7 +75,8 @@ python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
 python scripts/run_pipeline.py --stage lineup --matchday 1 --season 2627
 python scripts/evaluate_model.py --season 2425 --cutoffs 10,20,30
 python scripts/optimize_auction_roster.py --forecast /path/to/post_md4.csv \
-  --dossier-players /path/to/giocatori.csv --output-dir /path/to/output
+  --dossier-players /path/to/giocatori.csv --output-dir /path/to/output \
+  --reserve 10 --defence-modifier
 ```
 
 Before an auction or model run, validate the private snapshot:
@@ -161,9 +162,13 @@ Treat propensity outputs as rankings, not calibrated probabilities: the
 2025/26 backtest shows a monotone but ~0.09-overconfident top bin.
 
 For a full auction roster, `scripts/optimize_auction_roster.py` assigns exactly
-3P/8D/8C/6A with mixed-integer optimization under the 500-credit cap. It uses
+3P/8D/8C/6A with mixed-integer optimization under the 500-credit cap (minus
+`--reserve`, if passed, to keep credits free for still-open slots). It uses
 Monte Carlo propensity summaries and decreasing depth-slot utility; its auction
 costs remain FVM-derived planning references, not predicted clearing prices.
+It joins the forecast and the dossier on their shared `player_normalized`
+warehouse identity key and reports (rather than silently drops) any player
+present on only one side.
 The current open-access method scan and promotion criteria are documented in
 [`docs/open_literature_review_2026.md`](docs/open_literature_review_2026.md).
 

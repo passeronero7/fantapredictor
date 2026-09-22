@@ -41,6 +41,31 @@ class AuctionOptimizerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Insufficient eligible P"):
             optimize_auction_roster(frame)
 
+    def test_returns_legal_roster_when_ineligible_rows_precede_eligible_ones(self):
+        # Regression: rows without a usable auction_cost used to be dropped
+        # *after* the frame was reindexed to range(len(players)), leaving
+        # frame.index sparse while every row-position lookup downstream
+        # assumed a dense range. Placing the dropped rows first reproduces
+        # the resulting out-of-bounds / misaligned-constraint failure.
+        bad = pd.DataFrame([
+            {**self.build_players().iloc[0].to_dict(), "player": "bad1", "auction_cost": None},
+            {**self.build_players().iloc[1].to_dict(), "player": "bad2", "auction_cost": None},
+            {**self.build_players().iloc[2].to_dict(), "player": "bad3", "auction_cost": None},
+        ])
+        frame = pd.concat([bad, self.build_players()], ignore_index=True)
+        result = optimize_auction_roster(frame, AuctionOptimizationConfig(budget=500))
+        roster = result["roster"]
+        self.assertEqual(len(roster), 25)
+        self.assertEqual(roster.player.nunique(), 25)
+        self.assertNotIn("bad1", set(roster.player))
+
+    def test_reserve_is_kept_unspent(self):
+        result = optimize_auction_roster(
+            self.build_players(), AuctionOptimizationConfig(budget=500, reserve=50)
+        )
+        self.assertLessEqual(result["total_cost"], 450)
+        self.assertEqual(result["reserve"], 50)
+
     def test_availability_factor_discounts_utility(self):
         frame = self.build_players().iloc[:2].copy()
         frame["availability_factor"] = [1.0, 0.35]

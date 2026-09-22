@@ -37,7 +37,7 @@ class LineupOptimizerTests(unittest.TestCase):
         bonus_over_70 = optimizer.calculate_defense_modifier(7.1, [7.1, 7.1, 7.1])
         self.assertEqual(bonus_over_70, 3.0)
 
-        # Below 6.0 -> 0 bonus
+        # Anything at or below 6.5 -> 0 bonus
         bonus_55 = optimizer.calculate_defense_modifier(5.5, [5.5, 5.5, 5.5])
         self.assertEqual(bonus_55, 0.0)
 

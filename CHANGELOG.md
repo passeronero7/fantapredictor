@@ -13,6 +13,38 @@
 
 ### Fixed
 
+- Fixed the auction MILP constraint matrix indexing: filtering the player
+  pool after resetting its index (instead of before) left `frame.index`
+  sparse while row-position lookups assumed a dense `range(len(frame))`,
+  which could throw `IndexError` or silently drop the "each player at most
+  once" constraint for a player whose row landed on the budget row instead.
+  Regression test reproduces it with ineligible rows placed before eligible
+  ones.
+- Added `AuctionOptimizationConfig.reserve` and enforced `cost <= budget -
+  reserve` so the optimizer actually keeps the credits the auction config
+  reserves for still-open slots, instead of spending to exactly the full
+  budget.
+- Joined the auction forecast and dossier on the warehouse's own
+  `player_normalized` identity key (from `players.normalized_name` via
+  `player_id`) instead of a second, independently re-derived text
+  normalization applied to each CSV's display name; the previous key
+  silently dropped or could miscollide players whose two export spellings
+  differed (accents, suffixes, "Kamara H." vs "H. Kamara"-style variants).
+  `build_pool` now raises on duplicate identities and reports unmatched
+  rows on both sides instead of silently dropping them via an inner join.
+- Made the availability-horizon reference date in
+  `simulate_auction_propensity.py` an explicit `--as-of` argument instead of
+  `date.today()`, so the same forecast run is reproducible on a later day.
+- Fixed a data regression that had made the structured availability channel
+  a no-op for every player: a bulk refresh of `injuries_2026_27.csv` /
+  `availability_current.csv` had overwritten the only four rows carrying a
+  real `expected_return` date (Yildiz, Ekhator, K. Thuram, McTominay) with
+  the empty value used by the ~60 other, source-vague rows, so
+  `horizon_factor` silently returned 1.0 (no discount) for everyone. Also
+  stopped `optimize_auction_roster.py::build_pool`'s note-based 0.75/0.35
+  heuristic discount from re-applying on top of a player already
+  discounted by the (now working) structured channel, via a new
+  `availability_structured` flag emitted by the forecast.
 - Made the active Fantacalcio season-summary snapshot replace older snapshot
   rows even when its source filename changes, preventing ambiguous duplicate
   metrics during a point-in-time rollback or refresh.
