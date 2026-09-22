@@ -76,15 +76,17 @@ class LineupOptimizer:
 
     @staticmethod
     def calculate_defense_modifier(gk_vote: float, def_votes: List[float]) -> float:
-        """Return the standard +1/+3/+6 bonus from the best three defenders."""
+        """Return this league's modifier from goalkeeper + best three defenders.
+
+        Thresholds are strict: an average exactly equal to 6.5 or 7.0 does not
+        qualify.  The league awards +1 above 6.5 and +3 above 7.0.
+        """
         if len(def_votes) < 3:
             return 0.0
         mean_grade = (float(gk_vote) + sum(sorted(def_votes, reverse=True)[:3])) / 4.0
-        if mean_grade >= 7.0:
-            return 6.0
-        if mean_grade >= 6.5:
+        if mean_grade > 7.0:
             return 3.0
-        if mean_grade >= 6.0:
+        if mean_grade > 6.5:
             return 1.0
         return 0.0
 
@@ -207,8 +209,8 @@ class LineupOptimizer:
                 defender_votes = np.sort(vote_matrix[list(defender_indices)], axis=0)[::-1][:3]
                 average = (vote_matrix[gk_index] + defender_votes.sum(axis=0)) / 4.0
                 modifier_draws = np.select(
-                    [average >= 7.0, average >= 6.5, average >= 6.0],
-                    [6.0, 3.0, 1.0],
+                    [average > 7.0, average > 6.5],
+                    [3.0, 1.0],
                     default=0.0,
                 )
             total_draws = score_draws + modifier_draws

@@ -80,6 +80,11 @@ def main() -> None:
         "cost_model": "rounded FVM role-market reference; not a clearing-price forecast",
         "availability_policy": "0.75 for a current notice; 0.35 for explicit long-stop language",
     })
+    if args.defence_modifier:
+        summary["defence_modifier_rule"] = {
+            "average_of": "goalkeeper + best 3 defenders",
+            "strict_thresholds": {">6.5": 1, ">7.0": 3},
+        }
     summary_path = args.output_dir / f"rosa_ideale_{scenario}.json"
     summary_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n")
     print(json.dumps(summary, indent=2, ensure_ascii=False))

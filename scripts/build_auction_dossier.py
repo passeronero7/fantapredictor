@@ -20,7 +20,7 @@ from src.db import database, repository
 from src.utils.name_matching import normalize_name
 
 SLOTS = {'P':3,'D':8,'C':8,'A':6}
-BUDGETS = {'con_modificatore':{'P':45,'D':100,'C':120,'A':225},
+BUDGETS = {'con_modificatore':{'P':45,'D':85,'C':125,'A':235},
            'senza_modificatore':{'P':45,'D':65,'C':130,'A':250}}
 
 
@@ -150,7 +150,8 @@ def build(data_dir: Path, as_of: str):
     settings={'season':'2026/27','as_of':as_of,'managers':8,'budget':500,'auction_date':None,
               'auction_date_note':'Utente: sabato 25; 25 settembre 2026 venerdi, sabato 26. Da chiarire.',
               'format':'Classic assumed from supplied list','roster_slots_assumed':SLOTS,
-              'defence_modifier':'unconfirmed; both scenarios exported','role_budgets':BUDGETS,'reserve':10,
+              'defence_modifier':{'average_of':'goalkeeper + best 3 defenders','strict_thresholds':{'>6.5':1,'>7.0':3}},
+              'role_budgets':BUDGETS,'reserve':10,
               'eligible':len(eligible),'current_votes':int(observed.presenze_voto.sum()),'completed_matches':len(completed),
               'fixture_source':'Understat; matchday derived from provider order and validated for club uniqueness',
               'league_list_as_of':'2026-09-05','neural_model_approved':False}
@@ -161,7 +162,8 @@ def build(data_dir: Path, as_of: str):
            'Aprire **Dossier_asta_8_500.xlsx**: filtri per ruolo, squadra, rischio, minutaggio e titolarità probabile. '
            'Il listone completo conserva anche gli esclusi; il foglio Giocatori contiene soltanto confermati e acquistabili.', '',
            '## Budget e metodo', '',
-           'Ipotesi Classic 3P/8D/8C/6A, da confermare. Con modificatore: P 45, D 100, C 120, A 225, riserva 10. '
+           'Classic 3P/8D/8C/6A. Modificatore: media portiere + migliori 3 difensori, soglie strette '
+           '>6,5 = +1 e >7 = +3. Con modificatore: P 45, D 85, C 125, A 235, riserva 10. '
            'Senza modificatore: P 45, D 65, C 130, A 250, riserva 10.', '',
            'I riferimenti di spesa distribuiscono il budget di ciascun reparto sugli slot di tutte e 8 le squadre, '
            'in proporzione al FVM pubblico, riservando almeno 1 credito a ogni slot. Le soglie prudente/estesa '

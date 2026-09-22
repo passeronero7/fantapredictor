@@ -24,17 +24,18 @@ class LineupOptimizerTests(unittest.TestCase):
 
     def test_defense_modifier_calculation(self):
         optimizer = LineupOptimizer(self.players_df)
-        # Average grade = (6.5 + 6.5 + 6.5 + 6.5)/4 = 6.5 -> +3 bonus
+        # Thresholds are strict: exactly 6.5 and exactly 7.0 score zero/+1.
         bonus_65 = optimizer.calculate_defense_modifier(6.5, [6.5, 6.5, 6.5, 6.0])
-        self.assertEqual(bonus_65, 3.0)
+        self.assertEqual(bonus_65, 0.0)
 
-        # Average grade = (7.0 + 7.0 + 7.0 + 7.0)/4 = 7.0 -> +6 bonus
+        bonus_over_65 = optimizer.calculate_defense_modifier(6.6, [6.6, 6.6, 6.6])
+        self.assertEqual(bonus_over_65, 1.0)
+
         bonus_70 = optimizer.calculate_defense_modifier(7.0, [7.0, 7.0, 7.0])
-        self.assertEqual(bonus_70, 6.0)
+        self.assertEqual(bonus_70, 1.0)
 
-        # Average grade = (6.0 + 6.0 + 6.0 + 6.0)/4 = 6.0 -> +1 bonus
-        bonus_60 = optimizer.calculate_defense_modifier(6.0, [6.0, 6.0, 6.0])
-        self.assertEqual(bonus_60, 1.0)
+        bonus_over_70 = optimizer.calculate_defense_modifier(7.1, [7.1, 7.1, 7.1])
+        self.assertEqual(bonus_over_70, 3.0)
 
         # Below 6.0 -> 0 bonus
         bonus_55 = optimizer.calculate_defense_modifier(5.5, [5.5, 5.5, 5.5])
@@ -54,7 +55,8 @@ class LineupOptimizerTests(unittest.TestCase):
     def test_optimal_lineup_with_defense_modifier_adds_bonus(self):
         optimizer = LineupOptimizer(self.players_df, formation="4-3-3", enable_modificatore=True)
         res = optimizer.get_optimal_lineup()
-        self.assertGreater(res["defense_modifier_bonus"], 2.0)
+        self.assertGreater(res["defense_modifier_bonus"], 0.0)
+        self.assertLessEqual(res["defense_modifier_bonus"], 3.0)
         self.assertGreater(res["total_expected_points"], res["base_points"])
 
     def test_monte_carlo_simulation_draws_matrix(self):

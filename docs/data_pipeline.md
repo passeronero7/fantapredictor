@@ -271,7 +271,9 @@ single split.
 
 `LineupOptimizer` requires a price column and enforces the 500-credit default.
 It uses a bounded beam search for legal formations and correlated Monte Carlo
-draws by club before calculating the defence modifier.
+draws by club before calculating the league defence modifier: average of the
+goalkeeper and best three defenders, +1 strictly above 6.5 and +3 strictly
+above 7.0. Exactly 6.5 or 7.0 remains in the lower band.
 
 Lineup optimization can be run from a saved prediction artifact:
 

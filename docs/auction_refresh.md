@@ -101,9 +101,11 @@ The workbook exposes exclusions, missing identities, per-club coverage,
 minutes, npxG+xA/90, xGChain/xGBuildup, shots, key passes, bonuses, recent marks,
 2025/26 comparisons and the G5 probable XI.
 
-Classic 3P/8D/8C/6A is an explicit assumption pending the user's rules. The
-two 500-credit scenarios reserve 10 credits and allocate P/D/C/A respectively
-45/100/120/225 with a defence modifier or 45/65/130/250 without one. Expected
+Classic 3P/8D/8C/6A is the supplied roster structure. The defence modifier is
+the average of goalkeeper plus the best three defenders: +1 strictly above
+6.5 and +3 strictly above 7.0. The two 500-credit scenarios reserve 10 credits
+and allocate P/D/C/A respectively 45/85/125/235 with the modifier or
+45/65/130/250 without it. Expected
 league slots are eight times those roster positions. Provider FVM weights
 distribute each role budget after reserving one credit per slot. Prudence and
 stretch thresholds are planning choices, not calibrated clearing prices.
@@ -117,8 +119,7 @@ are outside the downloaded coverage. Calendar dates come from Understat,
 not an asserted official future-fixture feed.
 
 The requested “Saturday 25” is unresolved: 25 September 2026 is Friday,
-Saturday is 26 September. No exact auction date or defence-modifier rule is
-silently recorded as confirmed. Refresh again once G5 is complete (last
+Saturday is 26 September. Refresh again once G5 is complete (last
 fixture Milan-Lecce, Sunday 20 September) with `--last-matchday 5`, and
 again before the auction.
 

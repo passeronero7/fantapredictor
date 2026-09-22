@@ -83,6 +83,11 @@ a fracture or a long stop. These are conservative heuristics, not inferred
 recovery dates. Auction costs are rounded FVM-derived planning references, not
 learned clearing prices.
 
+The league-specific defence modifier uses the mean of the goalkeeper and best
+three defenders: +1 strictly above 6.5 and +3 strictly above 7.0. The auction
+defender premium is therefore intentionally smaller than for the widespread
++1/+3/+6 table.
+
 Promotion of a new paper-derived model requires:
 
 1. expanding-window evaluation with all features computed strictly before the

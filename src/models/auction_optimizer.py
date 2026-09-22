@@ -80,9 +80,10 @@ def optimize_auction_roster(
 
     frame["utility"] = player_utility(frame, config.reliability_weight)
     if config.defence_modifier:
-        # A modest, explicit roster-construction premium; matchday modifier
-        # points remain the responsibility of the lineup simulator.
-        frame.loc[frame["role"].eq("D"), "utility"] *= 1.08
+        # This league's modifier tops out at +3, so the roster-construction
+        # premium is deliberately smaller than for the common +1/+3/+6 table.
+        # Exact weekly points remain the responsibility of the lineup simulator.
+        frame.loc[frame["role"].eq("D"), "utility"] *= 1.04
 
     slots = [
         (role, depth, weight)

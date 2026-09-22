@@ -16,6 +16,9 @@
 - Made the active Fantacalcio season-summary snapshot replace older snapshot
   rows even when its source filename changes, preventing ambiguous duplicate
   metrics during a point-in-time rollback or refresh.
+- Replaced the generic +1/+3/+6 defence modifier with the league rule supplied
+  by the user: goalkeeper plus best three defenders, +1 above 6.5 and +3 above
+  7.0 (strict thresholds), and reduced the auction defence premium accordingly.
 
 ### September 19 data refresh (pre-matchday 5)
 
