@@ -148,6 +148,20 @@ class AuctionRefreshTests(unittest.TestCase):
         self.assertEqual(self.conn.execute('SELECT count(*) FROM player_season_stat_values').fetchone()[0],1)
         self.assertEqual(self.conn.execute('SELECT value FROM player_season_stat_values').fetchone()[0],7)
 
+    def test_new_statistics_snapshot_supersedes_previous_source_file(self):
+        self.price_frame().to_csv(self.path,index=False)
+        prices.load(self.conn,self.path,'2627')
+        season=self.conn.execute("SELECT id FROM seasons WHERE name='2026/27'").fetchone()[0]
+        frame=pd.DataFrame([{'player':'Test','source_ref':123,'club':'Roma','mv':6.5}])
+        load_statistics(self.conn,frame,season,self.path)
+        second=Path(self.tmp.name)/'new-statistics.csv'
+        load_statistics(self.conn,frame.assign(mv=7),season,second)
+        rows=self.conn.execute('''SELECT value,source_file FROM player_season_stat_values
+            WHERE category='fantacalcio_summary' ''').fetchall()
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]['value'],7)
+        self.assertEqual(rows[0]['source_file'],str(second))
+
     def test_recovered_vote_provider_id_consolidates_unidentified_row(self):
         folder=Path(self.tmp.name)/'votes';folder.mkdir()
         path=folder/'Voti_Giornata_01.csv'

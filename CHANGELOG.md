@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added a complete Classic auction-roster MILP optimizer (3P/8D/8C/6A,
+  500-credit default) driven by risk-adjusted Monte Carlo propensity summaries,
+  plus synthetic unit coverage and a reproducible CLI.
+- Added a 22 September 2026 open-access literature review mapping hierarchical
+  player ratings, event-rate ability, fantasy MILP, player-adjusted xG,
+  temporal forecasting and action-value work to adopted or deferred methods.
+
+### Fixed
+
+- Made the active Fantacalcio season-summary snapshot replace older snapshot
+  rows even when its source filename changes, preventing ambiguous duplicate
+  metrics during a point-in-time rollback or refresh.
+
 ### September 19 data refresh (pre-matchday 5)
 
 - Re-run the documented download → offline ingestion → dossier flow into a

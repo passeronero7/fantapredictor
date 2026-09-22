@@ -166,6 +166,13 @@ def load_statistics(conn, frame, season_id, source_file):
     sid = source_id(conn, 'fantacalcio')
     run, _ = start_run(conn, 'fantacalcio')
     count = 0
+    # This table represents the active provider season-summary snapshot.  Raw
+    # dated HTML/CSV files retain the audit trail; keeping one database row per
+    # snapshot would make the active value ambiguous because source_file is
+    # part of the historical uniqueness key.
+    conn.execute('''DELETE FROM player_season_stat_values
+        WHERE season_id=? AND category='fantacalcio_summary' AND source_id=?''',
+        (season_id, sid))
     for row in frame.to_dict('records'):
         pid = player_id(conn, row['player'], 'fantacalcio', row['source_ref'])
         cid = club_id(conn, row['club'], 'fantacalcio')
