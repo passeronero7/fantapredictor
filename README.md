@@ -148,9 +148,10 @@ Auction selection rests on a transparent stack (see
    Monte Carlo of P(median vote >= 6.0) over a horizon, per player:
    empirical-Bayes mark and appearance rates, bootstrap vote/bonus draws, and
    a role-directional style multiplier from club attack/defense indices.
-3. **Coach conditioning** — curated per-club coach profiles (module + style
-   tags, schema v2) shift role propensities; back-three modules lift
-   defenders, pragmatic coaches lift goalkeepers.
+3. **Coach conditioning** — dated coach history and per-coach role shares
+   of goals and assists rescale each player's goal/assist bonus when his
+   coaching context changes; validated season-ahead, deliberately weak
+   (`docs/coach_conditioning.md`).
 4. **Similar-player archetypes** — each estimate blends with the mean mark
    propensity of his 20 nearest same-role historical player-seasons by per-90
    technique signature (xG, xA, shots, key passes, xGChain/xGBuildup).

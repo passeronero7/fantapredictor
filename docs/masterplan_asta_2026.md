@@ -23,6 +23,11 @@ il rischio per la decisione d'asta, non l'eleganza.
   punti a giornata; la tabella allenatori è vuota da almeno il 6 settembre,
   quindi quel condizionamento non è mai stato attivo (non riattivato: delta
   non validati).
+- **Condizionamento allenatori attivo (23/09, richiesta utente)**: storia
+  delle panchine 2015/16-2026/27 (cambi Fiorentina e Bologna inclusi),
+  quote di gol e assist per reparto per allenatore, moltiplicatori per
+  giocatore validati con backtest (effetto piccolo, forza 0,25). Vedi
+  `docs/coach_conditioning.md`. Dati aggiornati alla G5.
 - **Prossimo**: Fase 2 (asta dal vivo).
 
 ---

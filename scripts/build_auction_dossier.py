@@ -53,6 +53,8 @@ def build(data_dir: Path, as_of: str):
         FROM player_prices pp JOIN players p ON pp.player_id=p.id JOIN clubs c ON c.id=pp.club_id
         WHERE pp.season_id=?''',conn,params=(season_id,))
     frame.source_ref = frame.source_ref.astype(int)
+    last_md = int(conn.execute('SELECT MAX(matchday) FROM player_match_ratings WHERE season_id=?',(season_id,)).fetchone()[0])
+    next_md = last_md+1
     current = pd.read_csv(season_dir/'fantacalcio/prices.csv').set_index('source_ref')
     frame['player'] = frame.source_ref.map(current.player).fillna(frame.player)
     frame['eligible'] = frame.in_league_list.eq(1)&frame.fuori_lista.eq(0)&frame.confirmed.eq(1)
@@ -62,9 +64,9 @@ def build(data_dir: Path, as_of: str):
         sum(goals) gol,sum(assists) assist,sum(yellow_cards) gialli,sum(red_cards) rossi,
         sum(goals_conceded) gol_subiti,sum(penalties_saved) rigori_parati,
         sum(penalties_scored) rigori_segnati,sum(penalties_missed) rigori_sbagliati,
-        avg(CASE WHEN matchday>=3 THEN vote END) mv_ultime_due,
-        avg(CASE WHEN matchday>=3 THEN fantavoto END) fm_ultime_due
-        FROM player_match_ratings WHERE season_id=? GROUP BY player_id''',conn,params=(season_id,))
+        avg(CASE WHEN matchday>=? THEN vote END) mv_ultime_due,
+        avg(CASE WHEN matchday>=? THEN fantavoto END) fm_ultime_due
+        FROM player_match_ratings WHERE season_id=? GROUP BY player_id''',conn,params=(last_md-1,last_md-1,season_id))
     history = pd.read_sql_query('''SELECT r.player_id,count(r.vote) presenze_2526,avg(r.vote) mv_2526,
         avg(r.fantavoto) fm_2526 FROM player_match_ratings r JOIN seasons s ON s.id=r.season_id
         WHERE s.name='2025/26' GROUP BY player_id''',conn)
@@ -93,7 +95,7 @@ def build(data_dir: Path, as_of: str):
     frame['campione_minuti_ridotto'] = frame.minuti.lt(180)|frame.minuti.isna()
     formations = pd.read_csv(season_dir/'coaches/probable_formations_2026_27.csv')
     starting_ids = {int(ref) for refs in formations.source_refs for ref in str(refs).split(';')}
-    frame['probabile_titolare_g5'] = frame.source_ref.isin(starting_ids)
+    frame[f'probabile_titolare_g{next_md}'] = frame.source_ref.isin(starting_ids)
     availability = pd.read_csv(season_dir/'coaches/availability_current.csv').fillna('')
     availability['key'] = availability.player.map(normalize_name)
     frame['key'] = frame.player.map(normalize_name)
@@ -129,10 +131,19 @@ def build(data_dir: Path, as_of: str):
     coverage = frame.groupby('club').agg(listone=('player','size'),acquistabili=('eligible','sum'),con_voto=('presenze_voto',lambda s:int(s.gt(0).sum())),
                                        con_xg=('xg','count'),indisponibili=('rischio_disponibilita','sum')).reset_index()
     teams = teams.merge(coverage,on='club')
+    coach_rows = pd.read_sql_query('''SELECT c.name club, co.full_name allenatore, co.preferred_module modulo,
+        ccs.started_at allenatore_dal, ccs.ended_at FROM coach_club_seasons ccs JOIN coaches co ON co.id=ccs.coach_id
+        JOIN clubs c ON c.id=ccs.club_id WHERE ccs.season_id=? ORDER BY ccs.started_at''',conn,params=(season_id,))
+    changes = coach_rows[coach_rows.ended_at.notna()].groupby('club').allenatore.agg(lambda s:', '.join(s)).rename('esonerati_2026_27')
+    current_coach = coach_rows[coach_rows.ended_at.isna()].drop(columns='ended_at')
+    if not current_coach.empty:
+        teams = teams.merge(current_coach,on='club',how='left').merge(changes,on='club',how='left')
+        frame = frame.merge(current_coach[['club','allenatore']],on='club',how='left')
+        eligible = eligible.merge(current_coach[['club','allenatore']],on='club',how='left')
     budget = pd.DataFrame([{'scenario':scenario,'ruolo':role,'posti':SLOTS[role],'crediti':credit,'crediti_lega':credit*8}
                           for scenario,roles in BUDGETS.items() for role,credit in roles.items()])
     paths = {'Giocatori':eligible,'Listone_completo':frame,'Squadre':teams,'Calendario':fixtures,
-             'Indisponibili':availability.drop(columns='key'),'Probabili_G5':formations,'Budget':budget,
+             'Indisponibili':availability.drop(columns='key'),f'Probabili_G{next_md}':formations,'Budget':budget,
              'Discrepanze_fonte':frame[frame.discrepanza_riepilogo][['player','club','presenze_voto','media_voto','fantamedia',
                 'presenze_riepilogo_fonte','mv_riepilogo_fonte','fm_riepilogo_fonte']],
              'Identita_da_verificare':pd.read_csv(season_dir/'reports/understat_identity_bridge.csv').query("status == 'unresolved'")}
@@ -174,21 +185,22 @@ def build(data_dir: Path, as_of: str):
            '## Lettura dei segnali', '',
            'Confrontare gol−xG per individuare finalizzazioni sopra/sotto attesa; npxG+xA/90 misura il coinvolgimento '
            'offensivo senza rigori. Sotto 180 minuti il rapporto per 90 è molto instabile. Confrontare le ultime due '
-           'giornate con la media 2025/26; quattro turni non bastano a stabilire il valore stagionale.', '',
-           'Le probabili sono della sola G5, non una garanzia di titolarità stagionale. Gli infortuni conservano '
-           'la descrizione della fonte: date di rientro vaghe non sono trasformate in date certe. '
+           f'giornate con la media 2025/26; {last_md} turni non bastano a stabilire il valore stagionale.', '',
+           f'Le probabili sono della sola G{next_md}, non una garanzia di titolarità stagionale. Gli infortuni conservano '
+           'la descrizione della fonte; la data di rientro usata dal modello traduce la finestra indicata '
+           '("metà ottobre" = 15/10, "fine X" = ultimo giorno del mese) ed è una stima, non una certezza. '
            'Per i portieri xG offensivo non è una misura di abilità: usare gol subiti, voti, rigori parati e contesto squadra.', '',
            f'Il riepilogo stagionale del sito differisce dalle pagelle giornaliere per {int(frame.discrepanza_riepilogo.sum())} '
            'giocatori del listone. Il foglio Discrepanze_fonte conserva entrambi i valori. MV e FM principali sono '
            'ricalcolate dalle pagelle scaricate; il riepilogo non sovrascrive i singoli voti osservati.', '',
            '## Copertura e limiti', '',
-           'Understat offre aggregati per 437 giocatori; le identità non abbinate restano nel foglio dedicato. '
+           f'Understat offre aggregati per {int(frame.minuti.notna().sum())} giocatori del listone; le identità non abbinate restano nel foglio dedicato. '
            'Le celle vuote indicano assenza di copertura, non zero. Nessuno scraping FBref: dati di pressing, '
            'duelli e PSxG individuale non sono presenti in questo aggiornamento. Il modello SHASH non ha superato '
            'il gate di valutazione e non è usato per questi prezzi.', '',
            'La lista di lega risale al 5 settembre: i nuovi ingressi non presenti restano esclusi fino a un nuovo export. '
            'Il 25 settembre 2026 è venerdì, sabato è il 26: data d’asta ancora da confermare. '
-           'Eseguire un nuovo aggiornamento dopo la G5 e a ridosso dell’asta; questo dossier fotografa il 16 settembre.', '',
+           f'Dati aggiornati alla G{last_md}; questo dossier fotografa il {as_of}.', '',
            '## Prime fasce per ruolo', '']
     for role in SLOTS:
         lines.append(f'### {role}')
@@ -203,11 +215,16 @@ def build(data_dir: Path, as_of: str):
         squad=eligible[eligible.club.eq(team.club)]
         signal=squad[squad.minuti.ge(180)&squad.role.ne('P')].sort_values('npxg_xa_90',ascending=False).head(2)
         examples='; '.join(f'{r.player} ({r.npxg_xa_90:.2f} npxG+xA/90, {r.minuti:.0f} minuti)' for r in signal.itertuples())
-        lines.append(f'- **{team.club}**: {team.gol_fatti:.0f} gol fatti / {team.gol_subiti:.0f} subiti; '
+        coach=getattr(team,'allenatore',None)
+        coach_text=f' Allenatore: {coach} ({team.modulo})' if isinstance(coach,str) else ''
+        sacked=getattr(team,'esonerati_2026_27',None)
+        if isinstance(sacked,str):
+            coach_text+=f', dal {team.allenatore_dal} al posto di {sacked}'
+        lines.append(f'- **{team.club}**:{coach_text}{"." if coach_text else ""} {team.gol_fatti:.0f} gol fatti / {team.gol_subiti:.0f} subiti; '
                      f'xG {team.xg:.2f} / xGA {team.xga:.2f}; {team.acquistabili} acquistabili. '
                      f'Segnali offensivi osservati: {examples or "campione insufficiente"}.')
     lines.extend(['','## Fonti','',
-        '- [Voti Fantacalcio, G4](https://www.fantacalcio.it/voti-fantacalcio-serie-a/2026-27/4)',
+        f'- [Voti Fantacalcio, G{last_md}](https://www.fantacalcio.it/voti-fantacalcio-serie-a/2026-27/{last_md})',
         '- [Statistiche e quotazioni Fantacalcio](https://www.fantacalcio.it/statistiche-serie-a/2026-27)',
         '- [Understat Serie A 2026](https://understat.com/league/Serie_A/2026)',
         '- [Football-Data Serie A](https://www.football-data.co.uk/italym.php)',

@@ -11,6 +11,35 @@
   player ratings, event-rate ability, fantasy MILP, player-adjusted xG,
   temporal forecasting and action-value work to adopted or deferred methods.
 
+### Added (coach conditioning, 23 September 2026)
+
+- `src/models/coach_profiles.py`: per-coach role shares of goals and assists
+  (D/C/A) over every Serie A matchday since 2015/16, shrunk toward the league
+  (120 pseudo-counts); per-player `goal_mult`/`assist_mult` compare the coach
+  now in charge with the coaches the player produced his history under.
+  The simulation rescales the goal (3) and assist (1) part of each sampled
+  bonus, so the effect reaches `expected_fantavoto` and the optimizer.
+  Strength λ = 0.25 from a season-ahead backtest on 2021/22-2025/26 (small
+  gain; λ = 1 is worse). See `docs/coach_conditioning.md`.
+- Coach history ingestion: 363 stints / 109 coaches with dates, including
+  the 2026/27 changes at Fiorentina (Vanoli for Grosso) and Bologna
+  (Palladino for Tedesco); matches attributed to coaches by date.
+- `--coach-strength` on `simulate_auction_propensity.py` (0 disables).
+- Availability discount on the real horizon calendar (share of horizon
+  matchdays dated on or after the return), so international breaks count.
+- Auction dossier: labels follow the latest observed matchday (no more
+  hard-coded G5/G4/"16 settembre"); club sheet and summary list the current
+  coach, module and in-season changes; players carry their coach.
+
+### Changed (coach conditioning)
+
+- The hand-set module/style-tag deltas are no longer applied by the
+  forecast: they only moved the reported `p_good_mark` column, never the
+  simulated marks, and had not been validated. `coach_style_adjustments`
+  now returns the open stint only (a club with an in-season change used to
+  resolve arbitrarily).
+- The coach CSV loader writes blank cells as NULL instead of NaN.
+
 ### Added (auction masterplan, phase 1)
 
 - Auction costs are floored at `--quotation-floor` x the public quotation

@@ -25,10 +25,10 @@ forecast horizon, conditioned on player history and club statistical attitude.
    bootstrapped from his own distribution (role pool below 3 observations),
    and the horizon statistic is P(median vote across the horizon >= 6.0)
    plus per-match P(vote >= 6), P(fantavoto >= 6.5), and expected fantavoto.
-5. **Coach playing style**: the `coach_club_seasons` schema is ready but the
-   curated table is empty, so coach-attitude conditioning is a documented
-   hook (`coach_style_adjustments`) — team-style proxies stand in. Fabricating
-   coach attributes would violate the project's evidence rules.
+5. **Coach tendencies** (since 23 September 2026): dated coach history
+   2015/16-2026/27 and per-coach role shares of goals and assists rescale
+   the goal/assist part of each player's sampled bonus (λ = 0.25, validated
+   season-ahead). See `docs/coach_conditioning.md`.
 
 ## Forecast snapshot (2026/27, MD3 horizon of 8 matchdays, 500 simulations)
 
@@ -69,7 +69,10 @@ Web-sourced coach profiles (football-italia.net probable-modules article,
 all 20 clubs with `preferred_module` and `style_tags` (schema v2 migration:
 `coaches.preferred_module`, `coaches.style_tags`). Two new conditioning layers:
 
-1. **Coach/module deltas**: transparent additive deltas per role — back-three
+1. **Coach/module deltas** (retired 23 September 2026: they only moved the
+   reported `p_good_mark`, never the simulated marks, and the coach table
+   they read had been empty since early September; replaced by
+   `docs/coach_conditioning.md`): transparent additive deltas per role — back-three
    modules lift D (+0.02, wing-back potential), two-AM modules lift C (+0.02),
    pragmatic/defensive-solidity tags lift P (+0.02) and penalise A (-0.01),
    possession tags lift D/C (+0.01). Applied before simulation, clipped to

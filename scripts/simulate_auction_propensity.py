@@ -27,12 +27,19 @@ sys.path.insert(0, str(ROOT))
 from config.settings import config
 from src.db import database, repository
 from src.utils.name_matching import normalize_name, normalize_team_name
+from src.models.coach_profiles import (
+    DEFAULT_LAMBDA,
+    DEFAULT_SHRINKAGE,
+    attach_coach,
+    coach_matchdays,
+    coach_profiles,
+    context_multipliers,
+)
 from src.models.propensity import (
     SimulationConfig,
     archetype_estimates,
     backtest_propensity,
     club_style_index,
-    coach_role_delta,
     coach_style_adjustments,
     player_propensity,
     simulate_horizon,
@@ -95,6 +102,71 @@ def formation_factors(
     return propensity.apply(factor, axis=1)
 
 
+def coach_context(
+    conn,
+    votes: pd.DataFrame,
+    propensity: pd.DataFrame,
+    season_name: str,
+    from_matchday: int,
+    strength: float = DEFAULT_LAMBDA,
+    shrinkage: float = DEFAULT_SHRINKAGE,
+) -> pd.DataFrame:
+    """Coach in charge at ``from_matchday`` and the goal/assist multipliers.
+
+    Profiles use every observed matchday before the horizon, including the
+    current coach's early-season stint; a player's own history is compared
+    with the coaches he produced it under. Returns an empty-multiplier frame
+    (all 1.0) when no coach history is loaded.
+    """
+    matchdays = coach_matchdays(conn)
+    columns = ["player_normalized", "coach", "coach_module", "goal_mult", "assist_mult"]
+    if matchdays.empty:
+        print("WARNING: coach history empty; coach conditioning off")
+        return pd.DataFrame(columns=columns)
+    observed = votes.dropna(subset=["vote"])
+    in_season = observed["season"].astype(str).eq(season_name)
+    rounds = pd.to_numeric(observed["matchday"], errors="coerce")
+    prior = attach_coach(observed[~in_season | (rounds < from_matchday)], matchdays)
+    profiles = coach_profiles(prior, shrinkage=shrinkage)
+    now = matchdays[matchdays["season"].eq(season_name) & matchdays["matchday"].eq(from_matchday)]
+    coach_of = dict(zip(now["club"], now["coach"]))
+    modules = {club: info.get("module") for club, info in coach_style_adjustments(conn, season_name).items()}
+    current = pd.DataFrame({
+        "player_normalized": propensity["player_normalized"],
+        "role": propensity["role"],
+        "coach": [coach_of.get(team) for team in propensity["team"]],
+    })
+    result = context_multipliers(prior, profiles, current, strength=strength)
+    result["coach_module"] = [modules.get(team) for team in propensity["team"]]
+    moved = result[(result["goal_mult"] - 1).abs().ge(0.05) | (result["assist_mult"] - 1).abs().ge(0.05)]
+    print(f"coach conditioning: {len(coach_of)} clubs, strength {strength}, shrinkage {shrinkage}; "
+          f"{len(moved)} players moved by >=5%")
+    return result[columns]
+
+
+def calendar_availability_factor(expected_return, horizon_dates: list[date]) -> float:
+    """Share of the horizon's matchdays played on or after the return date."""
+    try:
+        ret = date.fromisoformat(str(expected_return)[:10])
+    except (TypeError, ValueError):
+        return 1.0
+    if not horizon_dates:
+        return 1.0
+    return sum(d >= ret for d in horizon_dates) / len(horizon_dates)
+
+
+def horizon_match_dates(conn, season_name: str, from_matchday: int, matchdays: int) -> list[date]:
+    """Earliest scheduled date of each horizon matchday from the calendar."""
+    rows = conn.execute(
+        """SELECT m.matchday, MIN(date(m.match_date)) FROM matches m
+           JOIN seasons s ON s.id = m.season_id
+           WHERE s.name = ? AND m.matchday BETWEEN ? AND ?
+           GROUP BY m.matchday ORDER BY m.matchday""",
+        (season_name, from_matchday, from_matchday + matchdays - 1),
+    ).fetchall()
+    return [date.fromisoformat(r[1]) for r in rows if r[1]]
+
+
 def run_forecast(
     conn,
     season: str,
@@ -105,6 +177,7 @@ def run_forecast(
     seed: int,
     as_of: "date | None" = None,
     allow_missing_formations: bool = False,
+    coach_strength: float = DEFAULT_LAMBDA,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     from src.db.ingestors.common import season_label
 
@@ -180,15 +253,9 @@ def run_forecast(
             })
         propensity = pd.concat([propensity, pd.DataFrame(rows)], ignore_index=True)
 
-    # Coach conditioning: module and style-tag deltas per role.
-    conditioning = coach_style_adjustments(conn, season_name)
-    print(f"Coach conditioning active for {len(conditioning)} clubs")
-    propensity["coach_delta"] = [
-        coach_role_delta(conditioning.get(team), role)
-        for team, role in zip(propensity["team"], propensity["role"])
-    ]
-    propensity["p_good_mark"] = (
-        (propensity["p_good_mark"] + propensity["coach_delta"]).clip(0.0, 1.0)
+    propensity = propensity.merge(
+        coach_context(conn, votes, propensity, season_name, from_matchday, strength=coach_strength),
+        on="player_normalized", how="left",
     )
 
     # Similar-player archetype blend: nearest same-role historical
@@ -234,6 +301,7 @@ def run_forecast(
         "SELECT p.normalized_name AS key, a.expected_return FROM availability_notes a "
         "JOIN players p ON p.id = a.player_id", conn)
     horizon_start = as_of or date.today()
+    horizon_dates = horizon_match_dates(conn, season_name, from_matchday, matchdays)
     propensity["availability_structured"] = False
     if not avail.empty:
         horizon_days = matchdays * 7
@@ -244,10 +312,19 @@ def run_forecast(
         # those as structured would wrongly suppress the note-based fallback
         # discount downstream (see optimize_auction_roster.py::build_pool).
         dated = avail[avail["expected_return"].notna()]
-        factors = {
-            row["key"]: horizon_factor(row["expected_return"], horizon_start, horizon_days)
-            for _, row in dated.iterrows()
-        }
+        # Prefer the real calendar (international breaks included) over
+        # "matchdays x 7 days from as_of"; fall back to it without a calendar.
+        if len(horizon_dates) == matchdays:
+            factors = {
+                row["key"]: calendar_availability_factor(row["expected_return"], horizon_dates)
+                for _, row in dated.iterrows()
+            }
+            print(f"availability horizon from calendar: {horizon_dates[0]} .. {horizon_dates[-1]}")
+        else:
+            factors = {
+                row["key"]: horizon_factor(row["expected_return"], horizon_start, horizon_days)
+                for _, row in dated.iterrows()
+            }
         propensity["p_plays"] = [
             round(p * factors.get(key, 1.0), 3)
             for p, key in zip(propensity["p_plays"], propensity["player_normalized"])
@@ -278,7 +355,8 @@ def run_forecast(
         raise ValueError(f"Club pairing needs an even club list, got {len(clubs)}")
     result = simulate_horizon(priced, votes, style, clubs, sim_config)
     result = result.merge(
-        priced[["player_normalized", "price", "fvm", "availability_structured"]],
+        priced[["player_normalized", "price", "fvm", "availability_structured",
+                "coach", "coach_module", "goal_mult", "assist_mult"]],
         on="player_normalized", how="left",
     )
     result["availability_structured"] = result["availability_structured"].fillna(False)
@@ -306,6 +384,8 @@ def main() -> None:
                               "which makes the run non-reproducible across days")
     parser.add_argument("--allow-missing-formations", action="store_true",
                          help="Run without probable-formations conditioning instead of failing")
+    parser.add_argument("--coach-strength", type=float, default=DEFAULT_LAMBDA,
+                        help="Coach goal/assist context strength (0 disables; validated default)")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     as_of = date.fromisoformat(args.as_of) if args.as_of else None
@@ -332,6 +412,7 @@ def main() -> None:
             conn, args.season, args.from_matchday, args.matchdays,
             args.simulations, args.good_mark, args.seed, as_of=as_of,
             allow_missing_formations=args.allow_missing_formations,
+            coach_strength=args.coach_strength,
         )
     finally:
         conn.close()

@@ -13,6 +13,8 @@ from src.utils.name_matching import normalize_name
 def load(conn, path: str | Path) -> int:
     """Load coach tenures and optional season summaries from a CSV."""
     frame = pd.read_csv(path)
+    # Blank CSV cells must reach SQLite as NULL, not as float NaN.
+    frame = frame.astype(object).where(frame.notna(), None)
     required = {"season", "club", "coach"}
     missing = required - set(frame.columns)
     if missing:

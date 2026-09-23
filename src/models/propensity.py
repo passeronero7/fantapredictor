@@ -11,10 +11,12 @@ Conditioning signals currently in the warehouse:
 - player: observed vote/fantavoto distributions and appearance rates.
 - club module/style: shots, corners and goals for/against per match from
   ``match_team_stats``/``matches`` (all historical seasons).
-- coach playing style: the ``coach_club_seasons`` table is modelled in the
-  schema but not yet populated; :func:`coach_style_adjustments` returns an
-  empty adjustment and the simulation runs on team-style proxies. Populating
-  the curated coach history activates the hook without code changes.
+- coach tendencies: role shares of goals and assists under each coach
+  (``src.models.coach_profiles``), applied in the simulation as per-player
+  ``goal_mult``/``assist_mult`` columns that rescale the goal and assist part
+  of each sampled bonus. :func:`coach_style_adjustments` only describes the
+  current module and style tags; its hand-set deltas are not used by the
+  forecast (they were never validated and only moved a reported column).
 """
 
 from __future__ import annotations
@@ -74,7 +76,7 @@ def coach_style_adjustments(conn: sqlite3.Connection, season: str) -> dict[str, 
             JOIN coaches AS co ON co.id = ccs.coach_id
             JOIN clubs AS c ON c.id = ccs.club_id
             JOIN seasons AS s ON s.id = ccs.season_id
-            WHERE s.name = ?
+            WHERE s.name = ? AND ccs.ended_at IS NULL
             """,
             (season,),
         )
@@ -252,6 +254,10 @@ class SimulationConfig:
     seed: int = 20260903
 
 
+GOAL_BONUS = 3.0
+ASSIST_BONUS = 1.0
+
+
 def _per_player_samples(
     prior: pd.DataFrame, propensity: pd.DataFrame, min_obs: int = 3
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -260,22 +266,39 @@ def _per_player_samples(
     Players with fewer than ``min_obs`` observations fall back to their role
     distribution. Returns ``(votes, bonuses, nonzero_bonus_rate, mean_bonus)``
     shaped ``(n_players, width)`` plus the players' index labels.
+
+    When ``propensity`` carries ``goal_mult``/``assist_mult`` (coach
+    context), the goal and assist part of every sampled bonus is rescaled:
+    ``bonus + (goal_mult - 1) * 3 * goals + (assist_mult - 1) * assists``.
     """
     observed = prior.dropna(subset=["vote"]).copy()
     observed["bonus"] = (
         observed["fantavoto"] - observed["vote"]
     ).clip(lower=0)
+    for column in ("goals", "assists"):
+        if column not in observed:
+            observed[column] = 0.0
+        observed[column] = pd.to_numeric(observed[column], errors="coerce").fillna(0.0)
     role_pool = {role: block for role, block in observed.groupby("role")}
     rng = np.random.default_rng(0)
+    goal_mult = (propensity["goal_mult"] if "goal_mult" in propensity
+                 else pd.Series(1.0, index=propensity.index)).fillna(1.0).to_numpy()
+    assist_mult = (propensity["assist_mult"] if "assist_mult" in propensity
+                   else pd.Series(1.0, index=propensity.index)).fillna(1.0).to_numpy()
 
     votes, bonuses = [], []
-    for _, row in propensity.iterrows():
+    for position, (_, row) in enumerate(propensity.iterrows()):
         key = str(row["player_normalized"])
         block = observed[observed["player_normalized"].eq(key)]
         if len(block) < min_obs:
             block = role_pool.get(str(row["role"]), observed)
+        bonus = (
+            block["bonus"].to_numpy(dtype=float)
+            + (goal_mult[position] - 1.0) * GOAL_BONUS * block["goals"].to_numpy(dtype=float)
+            + (assist_mult[position] - 1.0) * ASSIST_BONUS * block["assists"].to_numpy(dtype=float)
+        )
         votes.append(block["vote"].to_numpy(dtype=float))
-        bonuses.append(block["bonus"].to_numpy(dtype=float))
+        bonuses.append(np.clip(bonus, 0.0, None))
     width = max(len(v) for v in votes)
     vote_matrix = np.full((len(votes), width), np.nan)
     bonus_matrix = np.full((len(votes), width), np.nan)
