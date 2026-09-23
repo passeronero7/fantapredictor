@@ -1,5 +1,23 @@
 # Serie A refresh and 8-manager auction dossier
 
+## 23 September 2026 refresh (current)
+
+Snapshot `refresh_2026_09_23` (acquired 13:31 UTC, `--last-matchday 5`):
+matchdays 1-5 complete (1,590 ratings, 50 Football-Data results), matchday-6
+probable XIs, 597 quotations, 48 availability notices. Compared with
+16 September: no club or Classic-role changes; two public additions (Lovric,
+Esteban) remain outside the 5 September league list; 240 quotation and 78
+FVM moves of at least 5. The official Fantacalcio quotations export of the
+same day (534 active + 63 sold) matches the scraped prices exactly; its only
+disagreement with the league list is Piana (Udinese, sold but still listed).
+The import rewrites the availability CSVs, so 38 return dates were re-derived
+from the source windows and re-ingested (rule in `AGENTS.md`). The dossier
+(`asta_8_500_2026_09_23`) now labels the latest matchday automatically and
+lists each club's coach, module and in-season changes. Coach history and the
+forecast's coach conditioning are documented in `docs/coach_conditioning.md`.
+
+## 19 September 2026 refresh (historical)
+
 The 19 September 2026 private snapshot (`refresh_2026_09_19`, acquired at
 00:03 UTC) supersedes the 16 September one. It contains 41 completed
 fixtures (matchdays 1-4 plus Monza-Sassuolo 2-1, the Friday opener of
@@ -20,7 +38,9 @@ for two players (Mastantuono 39→70, De Bruyne 103→97); eight players left
 the availability page and two entered it (Spinazzola/Napoli, Terzic/
 Frosinone); six clubs changed their probable XI or module. Results from
 16 September (40 completed fixtures, 437 aggregates, 595 quotations, 61
-notices) are retained in `data/backups/refresh_2026_09_19/`.
+notices) were retained in `data/backups/refresh_2026_09_19/`; on 24 September the
+backups were reduced to files with no identical copy elsewhere (the
+databases and the uncorrected 16 September dossier).
 
 The supplied league XLSX remains authoritative for eligibility and Classic
 roles. Its snapshot date is 5 September: 531 players are eligible, 62 are

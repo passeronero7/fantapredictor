@@ -28,6 +28,10 @@ il rischio per la decisione d'asta, non l'eleganza.
   quote di gol e assist per reparto per allenatore, moltiplicatori per
   giocatore validati con backtest (effetto piccolo, forza 0,25). Vedi
   `docs/coach_conditioning.md`. Dati aggiornati alla G5.
+- **Igiene (24/09)**: rimossi la copia dei dati nel clone pubblico, il
+  secondo virtualenv nel submodule, i backup identici e gli output superati.
+  Resta la doppia checkout del core (clone pubblico per lo sviluppo,
+  submodule nel workspace allineato con fast-forward).
 - **Prossimo**: Fase 2 (asta dal vivo).
 
 ---

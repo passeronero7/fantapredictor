@@ -4,19 +4,17 @@ An evidence-led probabilistic prediction and research engine for Serie A Fantaca
 
 ## Current state
 
-The 19 September 2026 refresh is documented in
+The 23 September 2026 refresh is documented in
 [`docs/auction_refresh.md`](docs/auction_refresh.md). The private warehouse
-now has all 380 scheduled fixtures (41 completed: matchdays 1-4 plus the
-Friday opener of matchday 5), 1,274 observed ratings through matchday 4
-(matchday 5 was in progress at snapshot time and its votes are not ingested),
-439 Understat aggregates, 597 current quotations, matchday-5 probable XIs,
-55 availability notices and 531 eligible players under the supplied
-5 September league list. The Excel dossier includes 20-club coverage,
-observed per-90 metrics, availability and two 8-manager/500-credit budget
-scenarios. These are transparent planning references, not approved neural
-predictions. Schema v6 / package 0.8.0 adds the previously missing auction
-eligibility fields, with fail-closed defaults. Older snapshot counts
-elsewhere in the docs are historical.
+holds all 380 scheduled fixtures, 1,590 observed ratings through matchday 5
+(complete), matchday-6 probable XIs, 597 quotations (identical to the official
+Fantacalcio export of the same day), 48 availability notices (38 with a
+return date translated from the source window) and 531 eligible players under
+the supplied 5 September league list. A dated coach history (2015/16-2026/27,
+including the Fiorentina and Bologna in-season changes) drives the coach
+conditioning of the forecast (`docs/coach_conditioning.md`). Dossier and
+roster outputs are transparent planning references, not approved neural
+predictions. Older snapshot counts elsewhere in the docs are historical.
 
 The codebase implements:
 - FBref manual-export validation and utility modules (`src/data_processing/`, `src/utils/`).
@@ -74,10 +72,28 @@ python scripts/run_pipeline.py --stage train --season 2627
 python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
 python scripts/run_pipeline.py --stage lineup --matchday 1 --season 2627
 python scripts/evaluate_model.py --season 2425 --cutoffs 10,20,30
-python scripts/optimize_auction_roster.py --forecast /path/to/post_md4.csv \
-  --dossier-players /path/to/giocatori.csv --output-dir /path/to/output \
-  --reserve 10 --defence-modifier
 ```
+
+Auction run (from the public core, against the private workspace data):
+
+```bash
+export FANTAPREDICTOR_DATA_DIR=/path/to/fantapredictor-workspace/data
+python scripts/download_auction_snapshot.py --snapshot $FANTAPREDICTOR_DATA_DIR/season_2026_27/raw/refresh_YYYY_MM_DD --last-matchday 5
+python scripts/prepare_auction_snapshot.py --snapshot ... --league-list ... --data-dir $FANTAPREDICTOR_DATA_DIR --checked-at <manifest checked_at>
+python scripts/build_auction_dossier.py --data-dir $FANTAPREDICTOR_DATA_DIR --as-of YYYY-MM-DD
+python scripts/simulate_auction_propensity.py --season 2627 --from-matchday 6 --matchdays 8 \
+  --simulations 10000 --seed 20260922 --as-of 2026-10-11 --output /path/to/forecast.csv
+python scripts/optimize_auction_roster.py --forecast /path/to/forecast.csv \
+  --dossier-players /path/to/giocatori.csv --output-dir /path/to/output \
+  --reserve 10 --defence-modifier --db $FANTAPREDICTOR_DATA_DIR/fantapredictor.db
+```
+
+The core clone's own `data/` directory is intentionally empty (only
+`season_2026_27/README.md`): every data-reading script must run with
+`FANTAPREDICTOR_DATA_DIR` pointing at the workspace. The forecast refuses to
+run without probable formations (`--allow-missing-formations` to override),
+so a missing variable fails loudly instead of silently using stale or absent
+data. `--coach-strength 0` produces the no-coach counterfactual.
 
 Before an auction or model run, validate the private snapshot:
 
@@ -212,7 +228,7 @@ See the full setup and future merge guide in [`docs/repository_architecture_and_
 - `src/` — modular Python package:
   - `src/db/` — the SQLite warehouse: `database.py` (connection, schema, versioned migrations), `build.py` (manifest resolution, checksum-skip, per-source error isolation), `repository.py` (the single read path for scripts and models), `schema.sql`, and `ingestors/` (one loader per source, e.g. `votes.py`, `understat.py`, `football_data.py`).
   - `src/data_processing/` — DataFrame-level transforms between raw exports and the warehouse or model inputs (`votes_processor.py`, `players_processor.py`, `match_data_builder.py`, `prices_processor.py`, `fbref_manual.py`, `soccerdata_understat.py`).
-  - `src/models/` — the probabilistic prediction and optimization layer (`neural_network.py`, `distributions.py`, `evaluation.py`, `confidence_model.py`, `lineup_optimizer.py`).
+  - `src/models/` — the probabilistic prediction and optimization layer (`neural_network.py`, `distributions.py`, `evaluation.py`, `confidence_model.py`, `lineup_optimizer.py`) and the auction stack (`propensity.py`, `coach_profiles.py`, `auction_optimizer.py`, `defence_modifier.py`).
   - `src/utils/` — small cross-cutting helpers (`name_matching.py`).
 - `tests/` — one file per module under test, run with `python -m unittest discover -s tests` or `pytest`.
 

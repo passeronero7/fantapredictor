@@ -11,6 +11,19 @@
   player ratings, event-rate ability, fantasy MILP, player-adjusted xG,
   temporal forecasting and action-value work to adopted or deferred methods.
 
+### Changed (23-24 September 2026: refresh, docs, repository hygiene)
+
+- Data refreshed to matchday 5 (23 September); see `docs/auction_refresh.md`.
+- README and AGENTS.md document the auction run end to end, the
+  `FANTAPREDICTOR_DATA_DIR` requirement, id-based formation matching, the
+  availability date rule and the coach-history maintenance rule.
+- The core clone's ignored `data/` copy (479 files identical to the
+  workspace, 2 stale August versions) was removed, so a run without
+  `FANTAPREDICTOR_DATA_DIR` can no longer silently read stale data. The
+  duplicate virtualenv in the workspace submodule, byte-identical backup
+  files and superseded auction outputs were removed from the private
+  workspace (untracked files only).
+
 ### Added (coach conditioning, 23 September 2026)
 
 - `src/models/coach_profiles.py`: per-coach role shares of goals and assists

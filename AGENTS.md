@@ -48,6 +48,8 @@ python scripts/run_pipeline.py --stage training-data --season 2627
 python scripts/run_pipeline.py --stage train --season 2627
 python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
 python scripts/analyze_defenders.py
+python scripts/simulate_auction_propensity.py --season 2627 --from-matchday 6 --matchdays 8 --as-of 2026-10-11
+python scripts/optimize_auction_roster.py --forecast ... --dossier-players ... --output-dir ... --reserve 10 --defence-modifier
 ```
 
 ## Prediction strategy rules
@@ -70,8 +72,22 @@ python scripts/analyze_defenders.py
   transparent (empirical distributions + shrinkage) and backtested before any
   change to its estimates. Report propensity as a ranking metric: the
   documented 2025/26 calibration is monotone but overconfident in the top bin.
-- Coach conditioning uses only curated `coach_club_seasons` rows with source
-  URLs; never fabricate coach modules or style tags.
+- Coach conditioning uses only curated, dated `coach_club_seasons` rows with
+  source URLs (workspace `coaches/coach_history.csv`); never fabricate
+  coaches, dates, modules or style tags. Record in-season changes with
+  `ended_at`/`started_at` and re-ingest (the loader is idempotent). The
+  forecast effect is the validated goal/assist context multiplier
+  (`src/models/coach_profiles.py`, λ from `backtest_coach_multipliers`);
+  re-run the backtest before changing λ or shrinkage, and do not reintroduce
+  hand-set module/tag deltas.
+- Every auction-facing run points `FANTAPREDICTOR_DATA_DIR` at the private
+  workspace; the core `data/` stays empty. Match probable XIs by official
+  player id (club-scoped name only as fallback), never by substring.
+- Availability return dates may translate an explicit source window with the
+  documented rule ("metà" = 15, "seconda metà" = 20, "fine" = last day,
+  "da <mese>" = 1st); leave vague notes undated. The discount uses the real
+  horizon calendar. A snapshot refresh rewrites the availability CSVs, so
+  re-apply dates and re-ingest after every refresh.
 - The predict stage falls back to labelled global-median/expanding-prior
   baselines whenever no model has passed the evaluation gate; never present
   unapproved SHASH output as auction-ready.
