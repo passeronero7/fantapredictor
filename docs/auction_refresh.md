@@ -86,35 +86,58 @@ to later private league decisions. No league credentials are required.
 
 ## Reproduce
 
-Run from the public core or the workspace submodule with the existing Python
-environment. First take a SQLite `Connection.backup()` and copy the active
-season directory into the ignored workspace `data/backups/` directory.
-Do not rebuild or wipe the warehouse: additive ingestion preserves history,
-attributes and manually curated sources.
+Run every step with `FANTAPREDICTOR_DATA_DIR` pointing at the private
+workspace `data/` directory (the core clone's own `data/` is empty on
+purpose). First take a SQLite `Connection.backup()` of the warehouse and copy
+the active season files into the ignored workspace `data/backups/`
+directory. Do not rebuild or wipe the warehouse: additive ingestion preserves
+history, attributes and manually curated sources.
 
 ```bash
+export FANTAPREDICTOR_DATA_DIR=/path/to/workspace/data
+SEASON=$FANTAPREDICTOR_DATA_DIR/season_2026_27
+
+# 1. Download a dated snapshot (network). --last-matchday = last round whose
+#    votes are published for all 20 clubs; the downloader refuses otherwise.
 python scripts/download_auction_snapshot.py \
-  --snapshot /path/to/workspace/data/season_2026_27/raw/refresh_2026_09_19 \
-  --last-matchday 4
+  --snapshot $SEASON/raw/refresh_YYYY_MM_DD --last-matchday N
 
+# 2. Import it (offline, idempotent). The league list is the private Leghe
+#    export; checked_at comes from the snapshot's acquisition_manifest.json.
 python scripts/prepare_auction_snapshot.py \
-  --snapshot /path/to/workspace/data/season_2026_27/raw/refresh_2026_09_19 \
-  --league-list /path/to/league_export.xlsx \
-  --data-dir /path/to/workspace/data \
-  --checked-at <checked_at-from-acquisition_manifest.json>
+  --snapshot $SEASON/raw/refresh_YYYY_MM_DD \
+  --league-list $SEASON/fantacalcio/<league_export>.xlsx \
+  --data-dir $FANTAPREDICTOR_DATA_DIR --checked-at <checked_at>
 
-python scripts/build_auction_dossier.py \
-  --data-dir /path/to/workspace/data --as-of 2026-09-19
+# 3. The import rewrites the availability CSVs without return dates:
+#    re-derive them from the source windows, keep the twin file identical,
+#    and ingest.
+python scripts/ingest_availability.py --csv $SEASON/coaches/availability_current.csv \
+  --derive-dates --as-of YYYY-MM-DD
+cp $SEASON/coaches/availability_current.csv $SEASON/coaches/injuries_2026_27.csv
+
+# 4. Coach changes since the last refresh: edit coaches/coach_history.csv
+#    (see AGENTS.md), then load it (idempotent).
+python scripts/ingest_coaches.py --csv $SEASON/coaches/coach_history.csv
+
+# 5. Dossier, forecast (from the first unplayed matchday, 8 rounds; --as-of
+#    = that matchday's date) and rosters.
+python scripts/build_auction_dossier.py --data-dir $FANTAPREDICTOR_DATA_DIR --as-of YYYY-MM-DD
+python scripts/simulate_auction_propensity.py --season 2627 --from-matchday N+1 \
+  --matchdays 8 --simulations 10000 --seed 20260922 --as-of <date of N+1> \
+  --output $SEASON/outputs/auction_propensity_2627_after_mdN_coach.csv
+python scripts/optimize_auction_roster.py \
+  --forecast $SEASON/outputs/auction_propensity_2627_after_mdN_coach.csv \
+  --dossier-players $SEASON/outputs/asta_8_500_YYYY_MM_DD/giocatori.csv \
+  --output-dir $SEASON/outputs/rosa_ideale_post_gN_YYYY_MM_DD_coach \
+  --reserve 10 --defence-modifier --db $FANTAPREDICTOR_DATA_DIR/fantapredictor.db
 ```
 
-Use a new dated directory for the next refresh. Increase `--last-matchday`
-only after every club's votes are published; the downloader refuses incomplete
-rounds. Raw snapshots and `acquisition_manifest.json` stay private. The
-offline step imports normalized files into SQLite and can be rerun safely.
-Run it after a warehouse rebuild as well: the legacy general build manifest
-does not declare the new summary metrics or identity bridge. The season and
-the original private league-list date in this workflow are currently specific
-to this 2026/27 project; update the documented list date when replacing it.
+Use a new dated directory for every refresh. Raw snapshots and
+`acquisition_manifest.json` stay private. Step 2 can be rerun safely, and must
+be rerun after a warehouse rebuild: the legacy general build manifest does
+not declare the summary metrics or identity bridge. The season and the
+private league-list file name are specific to this 2026/27 project.
 
 ## Data contract and quality controls
 

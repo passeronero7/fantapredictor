@@ -11,6 +11,18 @@
   player ratings, event-rate ability, fantasy MILP, player-adjusted xG,
   temporal forecasting and action-value work to adopted or deferred methods.
 
+### Added (operability, 24 September 2026)
+
+- `scripts/ingest_availability.py --derive-dates [--as-of] [--overwrite-dates]`:
+  the documented return-date rule in code (`derive_return_date`); on the
+  23 September notes it reproduces all 38 hand-derived dates and leaves the
+  same 10 notes undated.
+- `scripts/ingest_coaches.py`: idempotent CLI loader for the dated coach
+  history, printing the current coach of every club.
+- `CLAUDE.md` imports `AGENTS.md` so coding agents load the working rules.
+- `docs/auction_refresh.md` "Reproduce" is the complete refresh sequence
+  (snapshot, import, dates, coaches, dossier, forecast, rosters).
+
 ### Added (auction masterplan, phase 2: live auction, 24 September 2026)
 
 - `src/models/live_auction.py`: auction log (`giocatore,acquirente,prezzo`)

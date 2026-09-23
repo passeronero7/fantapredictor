@@ -143,5 +143,47 @@ class CalendarAvailabilityTests(unittest.TestCase):
         self.assertEqual(calendar_availability_factor(None, dates), 1.0)
 
 
+
+class ReturnDateRuleTests(unittest.TestCase):
+    def test_documented_windows(self):
+        from scripts.ingest_availability import derive_return_date
+
+        as_of = date(2026, 9, 23)
+        cases = {
+            "lesione, ipotizziamo un rientro dalla fine di novembre.": date(2026, 11, 30),
+            "punta a tornare convocabile dalla metà di ottobre.": date(2026, 10, 15),
+            "Recuperabile dalla prima metà di ottobre, da valutare.": date(2026, 10, 8),
+            "Proverà a tornare arruolabile dalla seconda metà di ottobre.": date(2026, 10, 20),
+            "Lungo stop e possibilità di rivederlo in campo da gennaio.": date(2027, 1, 1),
+            "stop che lo terrà ai box fino alla metà di ottobre.": date(2026, 10, 15),
+            "Recuperabile da inizio ottobre, ma da valutare.": date(2026, 10, 1),
+        }
+        for note, expected in cases.items():
+            self.assertEqual(derive_return_date(note, as_of), expected, note)
+
+    def test_injury_dates_and_vague_notes_stay_undated(self):
+        from scripts.ingest_availability import derive_return_date
+
+        as_of = date(2026, 9, 23)
+        # The only month is the injury date, not a return window.
+        self.assertIsNone(derive_return_date("KO a gennaio con la rottura del crociato.", as_of))
+        self.assertIsNone(derive_return_date("da valutare nei prossimi allenamenti.", as_of))
+        # A past window (before as_of) is ignored in favour of the future one.
+        note = "operato a fine giugno, pronto a tornare in campo dalla fine di ottobre."
+        self.assertEqual(derive_return_date(note, as_of), date(2026, 10, 31))
+
+    def test_derive_dates_keeps_existing_values(self):
+        from scripts.ingest_availability import derive_dates
+
+        frame = pd.DataFrame({
+            "player": ["a", "b"], "expected_return": ["2026-12-01", None],
+            "note": ["rientro da gennaio", "rientro da novembre"],
+        })
+        result = derive_dates(frame, date(2026, 9, 23))
+        self.assertEqual(list(result["expected_return"]), ["2026-12-01", "2026-11-01"])
+        result = derive_dates(frame, date(2026, 9, 23), overwrite=True)
+        self.assertEqual(result["expected_return"].iloc[0], "2027-01-01")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -51,6 +51,8 @@ python scripts/analyze_defenders.py
 python scripts/simulate_auction_propensity.py --season 2627 --from-matchday 6 --matchdays 8 --as-of 2026-10-11
 python scripts/optimize_auction_roster.py --forecast ... --dossier-players ... --output-dir ... --reserve 10 --defence-modifier
 python scripts/live_auction.py --forecast ... --dossier-players ... --state .../stato_asta.csv --me io --reserve 10 --defence-modifier
+python scripts/ingest_availability.py --csv .../availability_current.csv --derive-dates --as-of YYYY-MM-DD
+python scripts/ingest_coaches.py --csv .../coach_history.csv
 ```
 
 ## Prediction strategy rules
@@ -91,10 +93,15 @@ python scripts/live_auction.py --forecast ... --dossier-players ... --state .../
   log (`giocatore,acquirente,prezzo`) is append-only and rewritten
   atomically.
 - Availability return dates may translate an explicit source window with the
-  documented rule ("metà" = 15, "seconda metà" = 20, "fine" = last day,
-  "da <mese>" = 1st); leave vague notes undated. The discount uses the real
-  horizon calendar. A snapshot refresh rewrites the availability CSVs, so
-  re-apply dates and re-ingest after every refresh.
+  documented rule, implemented in `scripts/ingest_availability.py
+  --derive-dates` ("prima metà" = 8, "metà" = 15, "seconda metà" = 20,
+  "fine" = last day, "inizio"/"da <mese>" = 1st; only after a return word,
+  never before `--as-of`); vague notes stay undated. The discount uses the
+  real horizon calendar. A snapshot refresh rewrites the availability CSVs
+  without dates, so run `--derive-dates` and re-ingest after every refresh.
+- The private workspace's own `AGENTS.md` is the operational runbook
+  (current state, auction day, refresh, coach changes, git flow). Read it
+  before operating on real data.
 - The predict stage falls back to labelled global-median/expanding-prior
   baselines whenever no model has passed the evaluation gate; never present
   unapproved SHASH output as auction-ready.
