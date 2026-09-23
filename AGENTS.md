@@ -50,6 +50,7 @@ python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
 python scripts/analyze_defenders.py
 python scripts/simulate_auction_propensity.py --season 2627 --from-matchday 6 --matchdays 8 --as-of 2026-10-11
 python scripts/optimize_auction_roster.py --forecast ... --dossier-players ... --output-dir ... --reserve 10 --defence-modifier
+python scripts/live_auction.py --forecast ... --dossier-players ... --state .../stato_asta.csv --me io --reserve 10 --defence-modifier
 ```
 
 ## Prediction strategy rules
@@ -83,6 +84,12 @@ python scripts/optimize_auction_roster.py --forecast ... --dossier-players ... -
 - Every auction-facing run points `FANTAPREDICTOR_DATA_DIR` at the private
   workspace; the core `data/` stays empty. Match probable XIs by official
   player id (club-scoped name only as fallback), never by substring.
+- Live-auction bids come from `src/models/live_auction.py`: keep the MILP
+  solving to optimality (`MIP_REL_GAP`), keep pruning provably exact (a
+  test compares pruned and full optima), and present the maximum bid as an
+  indifference price capped by the legal bid, never as a target. The state
+  log (`giocatore,acquirente,prezzo`) is append-only and rewritten
+  atomically.
 - Availability return dates may translate an explicit source window with the
   documented rule ("metà" = 15, "seconda metà" = 20, "fine" = last day,
   "da <mese>" = 1st); leave vague notes undated. The discount uses the real

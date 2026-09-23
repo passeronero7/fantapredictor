@@ -11,6 +11,28 @@
   player ratings, event-rate ability, fantasy MILP, player-adjusted xG,
   temporal forecasting and action-value work to adopted or deferred methods.
 
+### Added (auction masterplan, phase 2: live auction, 24 September 2026)
+
+- `src/models/live_auction.py`: auction log (`giocatore,acquirente,prezzo`)
+  with accent/case-insensitive name and official-id resolution; per-manager
+  credits, open slots and legal maximum bid; money-conservation market
+  factor for unsold players; exact dominance pruning; residual plan with own
+  buys forced at the price paid; maximum bid per player (break-even price on
+  the real MILP), within 3 credits of exact bisection on the 23 September
+  data.
+- `scripts/live_auction.py`: interactive console (`q`, `m`, `v`, `p`, `b`,
+  `s`, `u`) with atomic state writes; `--command` for scripted runs.
+- `optimize_auction_roster.py --state`: residual plan, bids and manager
+  table as files; `--me`, `--managers`, `--no-market-scaling`.
+
+### Fixed (phase 2)
+
+- The roster MILP solves to optimality (`MIP_REL_GAP = 1e-9`). HiGHS's
+  default 0.01% gap (~0.009 objective) matched the gaps between
+  near-equivalent plans, so reported rosters could be near-optima (the
+  published 23 September roster scored 86.702 against a true 86.705).
+- The dossier-derived pool keeps the official id (`source_ref`).
+
 ### Changed (23-24 September 2026: refresh, docs, repository hygiene)
 
 - Data refreshed to matchday 5 (23 September); see `docs/auction_refresh.md`.

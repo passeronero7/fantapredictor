@@ -95,6 +95,22 @@ run without probable formations (`--allow-missing-formations` to override),
 so a missing variable fails loudly instead of silently using stale or absent
 data. `--coach-strength 0` produces the no-coach counterfactual.
 
+On auction day, run the live console against the same forecast and dossier;
+it logs every sale to the state CSV and re-plans after each one:
+
+```bash
+python scripts/live_auction.py --forecast /path/to/forecast.csv \
+  --dossier-players /path/to/giocatori.csv --state /path/to/stato_asta.csv \
+  --me io --reserve 10 --defence-modifier --db $FANTAPREDICTOR_DATA_DIR/fantapredictor.db
+# asta> q Thuram          maximum bid for the player on the block
+# asta> m De Gea 20       I bought him        asta> v Kean 70 Marco   sold to Marco
+# asta> p / b / s / u     plan, all bids, managers, undo
+```
+
+`optimize_auction_roster.py --state stato_asta.csv` writes the same residual
+plan, bids and manager table as files. See `docs/auction_refresh.md`
+("Live auction").
+
 Before an auction or model run, validate the private snapshot:
 
 ```bash
@@ -228,7 +244,7 @@ See the full setup and future merge guide in [`docs/repository_architecture_and_
 - `src/` — modular Python package:
   - `src/db/` — the SQLite warehouse: `database.py` (connection, schema, versioned migrations), `build.py` (manifest resolution, checksum-skip, per-source error isolation), `repository.py` (the single read path for scripts and models), `schema.sql`, and `ingestors/` (one loader per source, e.g. `votes.py`, `understat.py`, `football_data.py`).
   - `src/data_processing/` — DataFrame-level transforms between raw exports and the warehouse or model inputs (`votes_processor.py`, `players_processor.py`, `match_data_builder.py`, `prices_processor.py`, `fbref_manual.py`, `soccerdata_understat.py`).
-  - `src/models/` — the probabilistic prediction and optimization layer (`neural_network.py`, `distributions.py`, `evaluation.py`, `confidence_model.py`, `lineup_optimizer.py`) and the auction stack (`propensity.py`, `coach_profiles.py`, `auction_optimizer.py`, `defence_modifier.py`).
+  - `src/models/` — the probabilistic prediction and optimization layer (`neural_network.py`, `distributions.py`, `evaluation.py`, `confidence_model.py`, `lineup_optimizer.py`) and the auction stack (`propensity.py`, `coach_profiles.py`, `auction_optimizer.py`, `live_auction.py`, `defence_modifier.py`).
   - `src/utils/` — small cross-cutting helpers (`name_matching.py`).
 - `tests/` — one file per module under test, run with `python -m unittest discover -s tests` or `pytest`.
 

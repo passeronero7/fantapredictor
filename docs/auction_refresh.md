@@ -16,6 +16,42 @@ from the source windows and re-ingested (rule in `AGENTS.md`). The dossier
 lists each club's coach, module and in-season changes. Coach history and the
 forecast's coach conditioning are documented in `docs/coach_conditioning.md`.
 
+## Live auction (masterplan phase 2)
+
+`scripts/live_auction.py` is the auction-day console; `optimize_auction_roster.py
+--state` produces the same plan as files. Both read an append-only log
+`giocatore,acquirente,prezzo` (workspace `asta/stato_asta.csv`), resolve names
+ignoring case and accents (official ids work too), and after every sale:
+
+- remove players bought by others, force your own buys at the price paid;
+- rescale the reference cost of unsold players by the **market factor**:
+  credits left across the league divided by the reference cost of the
+  players needed to fill the league's open slots (per role). It starts at
+  ~1 and falls when others overspend early;
+- re-solve the roster MILP for the open slots (~0.1-1 s thanks to exact
+  dominance pruning, which provably keeps the optimum);
+- on request, the **maximum bid** for the player on the block (~0.2-4 s):
+  the price at which buying him leaves the plan exactly as good as the best
+  plan without him, capped by the legal maximum (credits left minus one per
+  other open slot). It is found on the real MILP (linear estimate from the
+  marginal value of a credit, then bracketed interpolation); on the 23
+  September data it is within 3 credits of an exact bisection for every
+  player checked, plan or not (e.g. De Gea 55 vs 54, Martinez L. 140 vs 140).
+
+The maximum bid replaces the dossier's `soglia_estesa` as the operating
+guide. Read it as an indifference price, not a target: buy at or below the
+reference when possible and never above the maximum. Late in the auction, or
+whenever many near-equivalent players remain, credits are worth little to
+the plan and maximum bids rise far above references; that is a property of
+the forecast's flat utilities, not a solver error.
+
+A mock auction of 24 sales (4 own, 20 to 6 rivals, prices 1-2x reference),
+including an unknown name, a double sale and an undo, ran end to end in
+12.6 s. The MILP now solves to optimality (`MIP_REL_GAP = 1e-9`): the HiGHS
+default 0.01% tolerance (~0.009 objective) was as large as the gaps between
+near-equivalent plans, and the published 23 September roster (objective
+86.702) was such a near-optimum; the true optimum is 86.705.
+
 ## 19 September 2026 refresh (historical)
 
 The 19 September 2026 private snapshot (`refresh_2026_09_19`, acquired at

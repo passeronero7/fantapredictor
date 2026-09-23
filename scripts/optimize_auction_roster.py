@@ -74,7 +74,7 @@ def build_pool(
 
     dossier["expected_vote"] = expected_vote(dossier)
     detail_columns = [
-        "player_normalized", cost_column, "quotazione", "soglia_prudente", "soglia_estesa",
+        "player_normalized", "source_ref", cost_column, "quotazione", "soglia_prudente", "soglia_estesa",
         "rischio_disponibilita", "kind", "note", "expected_vote",
     ]
     costs = dossier[[column for column in detail_columns if column in dossier]]
@@ -148,6 +148,40 @@ def role_budget_deviation(spend: dict[str, int], dossier_path: Path, scenario: s
     }
 
 
+def write_live_plan(pool: pd.DataFrame, config: AuctionOptimizationConfig,
+                    args: argparse.Namespace) -> None:
+    """Residual plan and maximum bids for the current auction state."""
+    from src.models.live_auction import LivePlanner, read_state
+
+    planner = LivePlanner(pool, config, me=args.me, managers=args.managers,
+                          market_scaling=not args.no_market_scaling)
+    state = read_state(args.state)
+    plan = planner.plan(state)
+    bids = planner.plan_bids(state)
+    scenario = "con_modificatore" if args.defence_modifier else "senza_modificatore"
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    roster = plan.roster.merge(
+        bids[["player", "offerta_max", "motivo", "se_lo_perdi"]] if not bids.empty
+        else pd.DataFrame(columns=["player", "offerta_max", "motivo", "se_lo_perdi"]),
+        on="player", how="left")
+    roster.to_csv(args.output_dir / f"piano_live_{scenario}.csv", index=False)
+    plan.managers.to_csv(args.output_dir / "partecipanti.csv", index=False)
+    summary = {
+        "scenario": scenario, "state": str(args.state), "sales": int(len(state)),
+        "me": args.me, "my_budget_left": plan.my_budget_left, "my_max_bid": plan.my_max_bid,
+        "objective": round(plan.objective, 4), "credit_value": round(plan.credit_value, 5),
+        "market_factor": round(plan.market_factor, 3),
+        "pool_after_pruning": plan.pool_size,
+        "bid_rule": ("price at which buying the player leaves the plan as good as the best "
+                     "plan without him, at reference prices for everyone else; capped by "
+                     "remaining credits minus one per other open slot"),
+    }
+    (args.output_dir / f"piano_live_{scenario}.json").write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False) + "\n")
+    print(roster.to_string(index=False))
+    print(json.dumps(summary, indent=2, ensure_ascii=False))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--forecast", type=Path, required=True)
@@ -167,6 +201,13 @@ def main() -> None:
                          help="Players each alternative must change versus every earlier one")
     parser.add_argument("--robustness-draws", type=int, default=100, help="0 skips the analysis")
     parser.add_argument("--seed", type=int, default=20260923)
+    parser.add_argument("--state", type=Path,
+                        help="Live auction log (giocatore,acquirente,prezzo): re-plan the open "
+                             "slots and write maximum bids instead of the pre-auction analysis")
+    parser.add_argument("--me", default="io", help="Your buyer name in --state")
+    parser.add_argument("--managers", type=int, default=8)
+    parser.add_argument("--no-market-scaling", action="store_true",
+                        help="With --state: keep dossier reference prices for unsold players")
     args = parser.parse_args()
 
     pool, match_report = build_pool(
@@ -189,6 +230,10 @@ def main() -> None:
             budget=args.budget, reserve=args.reserve, defence_modifier=True,
             modifier_marginal=calibration["marginal_points_per_vote_point_per_player"],
         )
+
+    if args.state:
+        write_live_plan(pool, config, args)
+        return
 
     results = alternative_rosters(pool, config, count=max(1, args.alternatives),
                                   min_changes=args.min_changes)

@@ -26,6 +26,10 @@ DEPTH_WEIGHTS = {
 # the three best defenders always count; the fourth defender only when one of
 # them does not play.
 MODIFIER_SLOT_WEIGHTS = {("P", 1): 1.0, ("D", 1): 1.0, ("D", 2): 1.0, ("D", 3): 1.0, ("D", 4): 0.3}
+# HiGHS stops by default within 0.01% of the optimum (~0.009 objective on a
+# full roster), the same size as the objective gaps that separate
+# near-equivalent plans and drive live bid limits. Solve to optimality.
+MIP_REL_GAP = 1e-9
 
 
 @dataclass(frozen=True)
@@ -173,7 +177,7 @@ class _Model:
             integrality=np.ones(len(self.variables)),
             bounds=Bounds(0.0, 1.0),
             constraints=LinearConstraint(matrix, np.concatenate(lower), np.concatenate(upper)),
-            options={"time_limit": 60.0},
+            options={"time_limit": 60.0, "mip_rel_gap": MIP_REL_GAP},
         )
         if not solution.success or solution.x is None:
             raise ValueError(f"No legal roster found: {solution.message}")

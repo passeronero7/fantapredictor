@@ -32,7 +32,13 @@ il rischio per la decisione d'asta, non l'eleganza.
   secondo virtualenv nel submodule, i backup identici e gli output superati.
   Resta la doppia checkout del core (clone pubblico per lo sviluppo,
   submodule nel workspace allineato con fast-forward).
-- **Prossimo**: Fase 2 (asta dal vivo).
+- **Fase 2 completata (24/09)**: console `scripts/live_auction.py` e
+  `optimize_auction_roster.py --state`; ri-ottimizzazione in 0,1-1 s,
+  offerta massima per il giocatore chiamato in 0,2-4 s (entro 3 crediti dalla
+  bisezione esatta), fattore di mercato sui soldi rimasti nella lega; asta
+  simulata di 24 aggiudicazioni senza errori. Il MILP ora risolve
+  all'ottimo (la tolleranza di default accettava piani quasi-ottimi).
+- **Prossimo**: Fase 3 (dopo l'asta).
 
 ---
 
