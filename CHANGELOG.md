@@ -11,8 +11,43 @@
   player ratings, event-rate ability, fantasy MILP, player-adjusted xG,
   temporal forecasting and action-value work to adopted or deferred methods.
 
+### Added (auction masterplan, phase 1)
+
+- Auction costs are floored at `--quotation-floor` x the public quotation
+  (default 0.5). The FVM reference prices only the top managers x slots
+  players per role and puts everyone else at 1; at that boundary it is
+  ~0.9-1.4x quotation, so a quotation-8 player just outside the pool looked
+  eight times cheaper than one just inside it.
+- `alternative_rosters`: the best roster plus runners-up that each differ
+  from every earlier roster by at least `--min-changes` players (no-good
+  cuts), with objective and cost, instead of one "ideal" roster.
+- `selection_robustness`: re-solves the MILP under log-normal cost (σ 0.25)
+  and forecast (σ 0.05) perturbations and reports each player's selection
+  rate, mean depth and median cost when selected (pilastro / frequente /
+  occasionale).
+- `src/models/defence_modifier.py` calibrates the league modifier on
+  observed matchdays (GK + best three defenders, strict +1/+3). On 2024/25
+  and 2025/26 it averaged 0.12-0.13 points per matchday (best club 0.24-0.34)
+  and one point of a starter's expected vote is worth ~0.22 modifier points
+  per matchday. The optimizer now adds that marginal value, times the
+  player's shrunk expected vote above his role's replacement level (median
+  of regular starters in the pool) and his p_plays, only on the P1 and D1-D3
+  slots (D4 at 0.3), replacing the flat x1.04 on every defender.
+- The optimizer summary reports spend by role against the dossier's planned
+  role budgets.
+
 ### Fixed
 
+- `simulate_auction_propensity.py` silently skipped probable-formations
+  conditioning when the formations file was missing from the resolved data
+  directory (e.g. `FANTAPREDICTOR_DATA_DIR` not set), inflating `p_plays` for
+  every player who had lost his place; it now fails unless
+  `--allow-missing-formations` is passed. The 23 September phase-0 rerun hit
+  exactly this and its published roster is superseded.
+- Probable-formation titolars are matched by official player id
+  (`source_refs`, as in the dossier) with an exact, club-scoped name fallback.
+  The previous substring match ignored the club, so e.g. Inter's "Thuram"
+  in the XI marked Juventus' injured Thuram K. as a titolar.
 - Fixed the auction MILP constraint matrix indexing: filtering the player
   pool after resetting its index (instead of before) left `frame.index`
   sparse while row-position lookups assumed a dense `range(len(frame))`,

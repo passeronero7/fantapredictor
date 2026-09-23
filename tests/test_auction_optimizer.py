@@ -5,8 +5,11 @@ import pandas as pd
 from src.models.auction_optimizer import (
     AuctionOptimizationConfig,
     ROSTER_SLOTS,
+    alternative_rosters,
+    modifier_premium,
     optimize_auction_roster,
     player_utility,
+    selection_robustness,
 )
 
 
@@ -72,6 +75,59 @@ class AuctionOptimizerTests(unittest.TestCase):
         utility = player_utility(frame)
         undiscounted_second = player_utility(frame.drop(columns="availability_factor")).iloc[1]
         self.assertAlmostEqual(utility.iloc[1], undiscounted_second * 0.35)
+
+    def test_alternatives_differ_by_at_least_min_changes(self):
+        results = alternative_rosters(
+            self.build_players(), AuctionOptimizationConfig(budget=500), count=3, min_changes=2
+        )
+        self.assertEqual(len(results), 3)
+        rosters = [set(r["roster"].player) for r in results]
+        for i in range(len(rosters)):
+            for j in range(i):
+                self.assertGreaterEqual(len(rosters[i] - rosters[j]), 2)
+        objectives = [r["objective"] for r in results]
+        self.assertEqual(objectives, sorted(objectives, reverse=True))
+
+    def test_modifier_premium_prefers_high_vote_defender_when_only_one_fits(self):
+        frame = self.build_players()
+        frame["expected_vote"] = 6.0
+        # Two otherwise identical star defenders, each costing 200: the
+        # budget fits one. Only the modifier premium can split them.
+        stars = frame.player.isin(["D8", "D9"])
+        frame.loc[stars, ["expected_fantavoto", "p_horizon_median_good", "auction_cost"]] = [7.5, 0.79, 200]
+        frame.loc[frame.player.eq("D8"), "expected_vote"] = 6.8
+        with_mod = optimize_auction_roster(frame, AuctionOptimizationConfig(defence_modifier=True))
+        chosen = set(with_mod["roster"].player) & {"D8", "D9"}
+        self.assertEqual(chosen, {"D8"})
+
+    def test_modifier_premium_is_zero_without_modifier(self):
+        frame = self.build_players()
+        frame["expected_vote"] = 7.5
+        result = optimize_auction_roster(frame, AuctionOptimizationConfig(defence_modifier=False))
+        self.assertTrue((result["roster"].modifier_premium == 0).all())
+
+    def test_robustness_reports_selection_rates(self):
+        report = selection_robustness(
+            self.build_players(), AuctionOptimizationConfig(budget=500), draws=5
+        )
+        self.assertTrue(report.selection_rate.between(0, 1).all())
+        # Every draw picks exactly 25 players.
+        self.assertAlmostEqual(report.selection_rate.sum(), 25.0)
+
+    def test_modifier_premium_is_centred_on_role_replacement_vote(self):
+        frame = pd.DataFrame({
+            "role": ["D", "D", "D", "D", "C"],
+            "p_plays": [0.9, 0.9, 0.9, 0.4, 0.9],
+            "expected_vote": [6.0, 6.0, 6.4, 5.8, 7.0],
+        })
+        premium = modifier_premium(frame, AuctionOptimizationConfig(defence_modifier=True))
+        # Regular defenders' median vote (6.0) is the zero point.
+        self.assertAlmostEqual(premium.iloc[0], 0.0)
+        self.assertGreater(premium.iloc[2], 0.0)
+        # A below-replacement defender is penalised, and playing less must
+        # not turn that into an advantage over a replacement-level regular.
+        self.assertLess(premium.iloc[3], 0.0)
+        self.assertEqual(premium.iloc[4], 0.0)
 
 
 if __name__ == "__main__":

@@ -101,6 +101,11 @@ top 15 as the Inter back-three benefit materialises.
 
 ## Reproduce
 
+Point `FANTAPREDICTOR_DATA_DIR` at the workspace data directory: the
+probable formations are read from there, and the run now stops if they are
+missing (override with `--allow-missing-formations`). Titolars are matched by
+official player id, with an exact club-scoped name fallback.
+
 Pass `--as-of YYYY-MM-DD` to fix the availability-horizon reference date; it
 defaults to the run date, which makes the injury discount (and therefore the
 ranking) shift from one day to the next even with identical inputs.

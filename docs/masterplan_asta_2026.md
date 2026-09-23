@@ -6,6 +6,25 @@ Origine: revisione critica dei commit `bed0510`, `de757d9`, `7ae8c87`. Ogni voce
 indica file toccati, criterio di accettazione (DoD) e stima. L'ordine riflette
 il rischio per la decisione d'asta, non l'eleganza.
 
+## Stato al 23 settembre
+
+- **Fase 0 completata** (commit `30c6df9`). Il rerun pubblicato quel giorno
+  era però viziato: `FANTAPREDICTOR_DATA_DIR` non era impostato e il
+  forecast aveva saltato in silenzio le probabili formazioni. Lo script ora
+  si ferma se mancano; quella rosa è superata.
+- **Fase 1 completata**: pavimento sulla quotazione (1.1), rose alternative e
+  robustezza (1.2), premio del modificatore calibrato sui voti 2025/26 (1.3),
+  scostamento dai budget di reparto nel JSON (1.4, solo report, nessun
+  vincolo). Corretto anche il matching delle formazioni (ID ufficiali invece
+  di sottostringhe su tutti i club).
+- **Scoperte che hanno cambiato il piano**: il premio 1.1 contava meno del
+  previsto perché le scelte a 1 credito erano soprattutto effetto del
+  `p_plays` gonfiato; il modificatore di questa lega vale in media ~0,13
+  punti a giornata; la tabella allenatori è vuota da almeno il 6 settembre,
+  quindi quel condizionamento non è mai stato attivo (non riattivato: delta
+  non validati).
+- **Prossimo**: Fase 2 (asta dal vivo).
+
 ---
 
 ## Fase 0 — Correttezza (bloccante, entro il 23/09)

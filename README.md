@@ -168,7 +168,12 @@ Monte Carlo propensity summaries and decreasing depth-slot utility; its auction
 costs remain FVM-derived planning references, not predicted clearing prices.
 It joins the forecast and the dossier on their shared `player_normalized`
 warehouse identity key and reports (rather than silently drops) any player
-present on only one side.
+present on only one side. Costs are floored at `--quotation-floor` x the
+public quotation; the defence-modifier premium is calibrated on observed
+matchdays (`--db`, `src/models/defence_modifier.py`). Besides the best
+roster it writes `--alternatives` runners-up that differ by at least
+`--min-changes` players and a `robustezza_*.csv` selection-rate report from
+`--robustness-draws` cost/forecast perturbations.
 The current open-access method scan and promotion criteria are documented in
 [`docs/open_literature_review_2026.md`](docs/open_literature_review_2026.md).
 

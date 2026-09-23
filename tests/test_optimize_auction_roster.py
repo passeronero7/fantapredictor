@@ -112,5 +112,39 @@ class BuildPoolTests(unittest.TestCase):
         self.assertEqual(pool["availability_factor"].iloc[0], 0.35)
 
 
+
+class CostFloorAndVoteTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.forecast_path = Path(self.tmp.name) / "forecast.csv"
+        self.dossier_path = Path(self.tmp.name) / "dossier.csv"
+        pd.DataFrame([
+            {"player": "Boundary", "player_normalized": "boundary", "team": "X", "role": "D",
+             "expected_fantavoto": 6.2, "p_plays": 0.8, "p_horizon_median_good": 0.6},
+        ]).to_csv(self.forecast_path, index=False)
+        pd.DataFrame([
+            {"player": "Boundary", "player_normalized": "boundary", "club": "X", "role": "D",
+             "riferimento_con_modificatore": 1.0, "quotazione": 8, "rischio_disponibilita": False,
+             "note": "", "media_voto": 7.0, "presenze_voto": 4, "mv_2526": 6.0, "presenze_2526": 30},
+        ]).to_csv(self.dossier_path, index=False)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_quotation_floor_lifts_one_credit_reference(self):
+        pool, _ = build_pool(self.forecast_path, self.dossier_path, True, quotation_floor=0.5)
+        self.assertEqual(pool["auction_cost"].iloc[0], 4)
+        self.assertTrue(pool["cost_floor_applied"].iloc[0])
+
+    def test_zero_floor_keeps_reference(self):
+        pool, _ = build_pool(self.forecast_path, self.dossier_path, True, quotation_floor=0.0)
+        self.assertEqual(pool["auction_cost"].iloc[0], 1)
+
+    def test_expected_vote_is_shrunk_towards_last_season(self):
+        pool, _ = build_pool(self.forecast_path, self.dossier_path, True)
+        # (7.0 x 4 + 6.0 x 6) / 10
+        self.assertAlmostEqual(pool["expected_vote"].iloc[0], 6.4)
+
+
 if __name__ == "__main__":
     unittest.main()

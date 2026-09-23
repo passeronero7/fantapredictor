@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT))
 
 from config.settings import config
 from src.db import database, repository
+from src.utils.name_matching import normalize_name, normalize_team_name
 from src.models.propensity import (
     SimulationConfig,
     archetype_estimates,
@@ -56,6 +57,44 @@ def attach_prices(
     return merged.rename(columns={"price_current": "price"})
 
 
+NON_TITOLAR_FACTOR = 0.6
+
+
+def formation_factors(
+    propensity: pd.DataFrame, formations: pd.DataFrame, prices: pd.DataFrame
+) -> pd.Series:
+    """p_plays multiplier from the official probable XIs.
+
+    Titolars are identified by the provider's official player id
+    (``source_refs``, the same key the auction dossier uses), falling back to
+    an exact normalized-name match *within the player's own club* for players
+    without a quotation id. The previous any-club substring match let a name
+    such as "thuram" (Inter) pick up "Thuram K." (Juventus) and never used
+    the club at all.
+    """
+    starting_ids: set[int] = set()
+    for refs in formations.get("source_refs", pd.Series(dtype=str)).dropna():
+        starting_ids.update(int(ref) for ref in str(refs).split(";") if ref.strip().isdigit())
+    starting_names: set[tuple[str, str]] = set()
+    for _, row in formations.iterrows():
+        club = normalize_team_name(str(row["club"]))
+        for name in re.split(r"[;,]", str(row["titulars"])):
+            if name.strip():
+                starting_names.add((club, normalize_name(name)))
+
+    refs = prices.dropna(subset=["source_ref"]).drop_duplicates("player_normalized", keep=False)
+    ref_of = dict(zip(refs["player_normalized"], refs["source_ref"].astype(int)))
+
+    def factor(row) -> float:
+        ref = ref_of.get(row["player_normalized"])
+        if ref is not None:
+            return 1.0 if ref in starting_ids else NON_TITOLAR_FACTOR
+        key = (normalize_team_name(str(row["team"])), normalize_name(str(row["player"])))
+        return 1.0 if key in starting_names else NON_TITOLAR_FACTOR
+
+    return propensity.apply(factor, axis=1)
+
+
 def run_forecast(
     conn,
     season: str,
@@ -65,6 +104,7 @@ def run_forecast(
     good_mark: float,
     seed: int,
     as_of: "date | None" = None,
+    allow_missing_formations: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     from src.db.ingestors.common import season_label
 
@@ -168,30 +208,26 @@ def run_forecast(
     prices_frame = repository.load_prices(conn, season)
     prices_frame = prices_frame[prices_frame["fuori_lista"].fillna(0).eq(0)].copy()
     # Official probable-formations conditioning: titolars keep their
-    # appearance estimate; players absent from both the XI and the bench
-    # rotation get cut in half. Ballottaggio players keep 0.75.
+    # appearance estimate, everyone else is scaled by NON_TITOLAR_FACTOR.
     formation_path = config.get_season_dir(season) / "coaches" / "probable_formations_2026_27.csv"
     if formation_path.exists():
-        import re as _re
         form = pd.read_csv(formation_path)
-        titolar_map: dict[str, float] = {}
-        for _, row in form.iterrows():
-            club = str(row["club"]).strip()
-            names = [n.strip() for n in _re.split(r"[;,]", str(row["titulars"]))]
-            for n in names:
-                titolar_map[n.lower()] = 1.0
-        status_map = titolar_map
-        def factor(row):
-            key = re.sub(r"[^a-z ]", "", str(row["player"]).lower()).strip()
-            for name, value in status_map.items():
-                fname = re.sub(r"[^a-z ]", "", name).strip()
-                if fname and (fname in key or key in fname):
-                    return value
-            return 0.6
-        propensity["formation_factor"] = propensity.apply(factor, axis=1)
+        propensity["formation_factor"] = formation_factors(propensity, form, prices_frame)
         boosted = int((propensity["formation_factor"] >= 1.0).sum())
-        print(f"formation conditioning: {boosted} titolars, others x0.6")
+        print(f"formation conditioning ({formation_path}): {boosted} titolars, "
+              f"others x{NON_TITOLAR_FACTOR}")
         propensity["p_plays"] = (propensity["p_plays"] * propensity["formation_factor"]).clip(0, 1)
+    elif not allow_missing_formations:
+        # A missing file used to skip this step silently, inflating p_plays
+        # for every player who has lost his place (typically because
+        # FANTAPREDICTOR_DATA_DIR was not pointed at the private workspace).
+        raise FileNotFoundError(
+            f"Probable formations not found at {formation_path}; set "
+            "FANTAPREDICTOR_DATA_DIR to the workspace data directory or pass "
+            "--allow-missing-formations"
+        )
+    else:
+        print(f"WARNING: no probable formations at {formation_path}; p_plays unconditioned")
     # Availability channel: proportional p_plays discount by missed horizon.
     from scripts.ingest_availability import horizon_factor
     avail = pd.read_sql_query(
@@ -268,6 +304,8 @@ def main() -> None:
     parser.add_argument("--as-of", type=str, default=None,
                          help="Availability horizon reference date (ISO); defaults to today, "
                               "which makes the run non-reproducible across days")
+    parser.add_argument("--allow-missing-formations", action="store_true",
+                         help="Run without probable-formations conditioning instead of failing")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     as_of = date.fromisoformat(args.as_of) if args.as_of else None
@@ -293,6 +331,7 @@ def main() -> None:
         result, style = run_forecast(
             conn, args.season, args.from_matchday, args.matchdays,
             args.simulations, args.good_mark, args.seed, as_of=as_of,
+            allow_missing_formations=args.allow_missing_formations,
         )
     finally:
         conn.close()
