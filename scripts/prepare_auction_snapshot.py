@@ -191,7 +191,8 @@ def load_statistics(conn, frame, season_id, source_file):
     return count
 
 
-def prepare(snapshot: Path, league_path: Path, data_dir: Path, checked_at: str):
+def prepare(snapshot: Path, league_path: Path, data_dir: Path, checked_at: str,
+            league_list_as_of: str | None = None):
     season_dir = data_dir / 'season_2026_27'
     public = pd.read_csv(snapshot / 'prices_public.csv')
     league = pd.read_excel(league_path)
@@ -303,7 +304,7 @@ def prepare(snapshot: Path, league_path: Path, data_dir: Path, checked_at: str):
                    'foreign_key_errors':len(conn.execute('PRAGMA foreign_key_check').fetchall())})
     conn.close()
     report = {'checked_at':checked_at,'season':'2026/27','league_list':str(league_path),
-              'league_list_as_of':'2026-09-05','return_date_policy':'Unknown unless explicitly dated; narrative retained in CSV.',**counts}
+              'league_list_as_of':league_list_as_of,'return_date_policy':'Unknown unless explicitly dated; narrative retained in CSV.',**counts}
     (season_dir / f'reports/refresh_{checked_at[:10].replace("-","_")}.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n')
     return report
 
@@ -314,5 +315,7 @@ if __name__ == '__main__':
     parser.add_argument('--league-list', type=Path, required=True)
     parser.add_argument('--data-dir', type=Path, required=True)
     parser.add_argument('--checked-at', required=True)
+    parser.add_argument('--league-list-as-of', help='Date of the private league export (YYYY-MM-DD)')
     args = parser.parse_args()
-    print(json.dumps(prepare(args.snapshot,args.league_list,args.data_dir,args.checked_at),indent=2,ensure_ascii=False))
+    print(json.dumps(prepare(args.snapshot,args.league_list,args.data_dir,args.checked_at,
+                             args.league_list_as_of),indent=2,ensure_ascii=False))

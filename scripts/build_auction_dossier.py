@@ -39,7 +39,7 @@ def allocate_market(frame: pd.DataFrame, role_budgets: dict, managers: int = 8) 
     return result
 
 
-def build(data_dir: Path, as_of: str):
+def build(data_dir: Path, as_of: str, league_list_as_of: str | None = None):
     season_dir = data_dir/'season_2026_27'
     out = season_dir/'outputs'/f'asta_8_500_{as_of.replace("-","_")}'
     out.mkdir(parents=True,exist_ok=True)
@@ -166,11 +166,12 @@ def build(data_dir: Path, as_of: str):
               'role_budgets':BUDGETS,'reserve':10,
               'eligible':len(eligible),'current_votes':int(observed.presenze_voto.sum()),'completed_matches':len(completed),
               'fixture_source':'Understat; matchday derived from provider order and validated for club uniqueness',
-              'league_list_as_of':'2026-09-05','neural_model_approved':False}
+              'league_list_as_of':league_list_as_of,'neural_model_approved':False}
+    league_date = league_list_as_of or 'data non specificata'
     (out/'impostazioni_e_limiti.json').write_text(json.dumps(settings,indent=2,ensure_ascii=False)+'\n')
     lines=[f'# Asta a 8, 500 crediti — aggiornamento {as_of}', '',
            f'{len(completed)} gare concluse, {len(fixtures)} incontri a calendario, {int(observed.presenze_voto.sum())} voti, '
-           f'{len(eligible)} giocatori acquistabili secondo il listone di lega del 5 settembre.', '',
+           f'{len(eligible)} giocatori acquistabili secondo il listone di lega del {league_date}.', '',
            'Aprire **Dossier_asta_8_500.xlsx**: filtri per ruolo, squadra, rischio, minutaggio e titolarità probabile. '
            'Il listone completo conserva anche gli esclusi; il foglio Giocatori contiene soltanto confermati e acquistabili.', '',
            '## Budget e metodo', '',
@@ -198,7 +199,7 @@ def build(data_dir: Path, as_of: str):
            'Le celle vuote indicano assenza di copertura, non zero. Nessuno scraping FBref: dati di pressing, '
            'duelli e PSxG individuale non sono presenti in questo aggiornamento. Il modello SHASH non ha superato '
            'il gate di valutazione e non è usato per questi prezzi.', '',
-           'La lista di lega risale al 5 settembre: i nuovi ingressi non presenti restano esclusi fino a un nuovo export. '
+           f'La lista di lega risale al {league_date}: i nuovi ingressi non presenti restano esclusi fino a un nuovo export. '
            'Il 25 settembre 2026 è venerdì, sabato è il 26: data d’asta ancora da confermare. '
            f'Dati aggiornati alla G{last_md}; questo dossier fotografa il {as_of}.', '',
            '## Prime fasce per ruolo', '']
@@ -249,6 +250,7 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data-dir',type=Path,required=True)
     parser.add_argument('--as-of',required=True)
+    parser.add_argument('--league-list-as-of',help='Date of the private league export (YYYY-MM-DD)')
     args=parser.parse_args()
-    settings,out=build(args.data_dir,args.as_of)
+    settings,out=build(args.data_dir,args.as_of,args.league_list_as_of)
     print(json.dumps(settings,indent=2,ensure_ascii=False));print(out)

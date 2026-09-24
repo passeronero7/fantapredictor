@@ -4,13 +4,13 @@ An evidence-led probabilistic prediction and research engine for Serie A Fantaca
 
 ## Current state
 
-The 23 September 2026 refresh is documented in
+The 24 September 2026 refresh is documented in
 [`docs/auction_refresh.md`](docs/auction_refresh.md). The private warehouse
 holds all 380 scheduled fixtures, 1,590 observed ratings through matchday 5
-(complete), matchday-6 probable XIs, 597 quotations (identical to the official
-Fantacalcio export of the same day), 48 availability notices (38 with a
-return date translated from the source window) and 531 eligible players under
-the supplied 5 September league list. A dated coach history (2015/16-2026/27,
+(complete), matchday-6 probable XIs, 598 quotations (matching the private
+league export by provider ID and quotation), 48 availability notices (38 with a
+return date translated from the source window) and 535 eligible players under
+the supplied 24 September league list. A dated coach history (2015/16-2026/27,
 including the Fiorentina and Bologna in-season changes) drives the coach
 conditioning of the forecast (`docs/coach_conditioning.md`). Dossier and
 roster outputs are transparent planning references, not approved neural
@@ -79,8 +79,8 @@ Auction run (from the public core, against the private workspace data):
 ```bash
 export FANTAPREDICTOR_DATA_DIR=/path/to/fantapredictor-workspace/data
 python scripts/download_auction_snapshot.py --snapshot $FANTAPREDICTOR_DATA_DIR/season_2026_27/raw/refresh_YYYY_MM_DD --last-matchday 5
-python scripts/prepare_auction_snapshot.py --snapshot ... --league-list ... --data-dir $FANTAPREDICTOR_DATA_DIR --checked-at <manifest checked_at>
-python scripts/build_auction_dossier.py --data-dir $FANTAPREDICTOR_DATA_DIR --as-of YYYY-MM-DD
+python scripts/prepare_auction_snapshot.py --snapshot ... --league-list ... --league-list-as-of YYYY-MM-DD --data-dir $FANTAPREDICTOR_DATA_DIR --checked-at <manifest checked_at>
+python scripts/build_auction_dossier.py --data-dir $FANTAPREDICTOR_DATA_DIR --as-of YYYY-MM-DD --league-list-as-of YYYY-MM-DD
 python scripts/simulate_auction_propensity.py --season 2627 --from-matchday 6 --matchdays 8 \
   --simulations 10000 --seed 20260922 --as-of 2026-10-11 --output /path/to/forecast.csv
 python scripts/optimize_auction_roster.py --forecast /path/to/forecast.csv \
@@ -150,14 +150,14 @@ The auction pipeline now runs on an official-first data layer, ingested and
 committed in the private workspace:
 
 1. **League auction list** (Fantacalcio Leghe app export, `lista_ufficiale_*.xlsx`):
-   531 selectable + 62 `fuori lista` players. Flags live in
+   535 selectable + 63 `fuori lista` players in the 24 September export. Flags live in
    `player_prices.in_league_list` / `player_prices.fuori_lista`; the forecast
    pool excludes unselectable players automatically.
-2. **Official Statistico 2026/27** (`fantacalcio_season_stats` table): 593
-   players through the latest completed matchday (media voto, fantamedia,
-   bonus/malus, penalties) — including live MD3 data.
+2. **Official Statistico 2026/27** (season-summary metrics in the warehouse):
+   source-level media voto, fantamedia and bonus/malus through matchday 5;
+   daily observed ratings remain separate from this summary.
 3. **Official probable formations** (`coaches/probable_formations_2026_27.csv`,
-   source: fantacalcio.it infographics, updated 3 September): titolars,
+   source: fantacalcio.it infographics, refreshed 24 September): titolars,
    bench rotation, penalty takers, set-piece takers for all 20 clubs. The
    propensity forecast conditions `p_plays` on titolar status (x1.0 titolar,
    x0.6 absent from XI and rotation).

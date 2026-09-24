@@ -1,6 +1,18 @@
 # Serie A refresh and 8-manager auction dossier
 
-## 23 September 2026 refresh (current)
+## 24 September 2026 refresh (current)
+
+The refreshed private league export contains 598 provider IDs. The same-day
+public quotation snapshot contains the same 598 IDs and quotation values.
+Five names enter the league export (Alaba, Leite, Esteban, Libra, Lovric) and
+Piana is marked outside the list, leaving 535 eligible players. The public
+snapshot adds Alaba; the other 597 players have unchanged quotation, FVM,
+club and Classic role versus 23 September. Matchdays 1-5 remain complete
+(1,590 ratings), with 48 availability notices and 38 derived return dates.
+The import and dossier now record the league-export date explicitly with
+`--league-list-as-of`.
+
+## 23 September 2026 refresh (historical)
 
 Snapshot `refresh_2026_09_23` (acquired 13:31 UTC, `--last-matchday 5`):
 matchdays 1-5 complete (1,590 ratings, 50 Football-Data results), matchday-6
@@ -107,6 +119,7 @@ python scripts/download_auction_snapshot.py \
 python scripts/prepare_auction_snapshot.py \
   --snapshot $SEASON/raw/refresh_YYYY_MM_DD \
   --league-list $SEASON/fantacalcio/<league_export>.xlsx \
+  --league-list-as-of YYYY-MM-DD \
   --data-dir $FANTAPREDICTOR_DATA_DIR --checked-at <checked_at>
 
 # 3. The import rewrites the availability CSVs without return dates:
@@ -122,7 +135,8 @@ python scripts/ingest_coaches.py --csv $SEASON/coaches/coach_history.csv
 
 # 5. Dossier, forecast (from the first unplayed matchday, 8 rounds; --as-of
 #    = that matchday's date) and rosters.
-python scripts/build_auction_dossier.py --data-dir $FANTAPREDICTOR_DATA_DIR --as-of YYYY-MM-DD
+python scripts/build_auction_dossier.py --data-dir $FANTAPREDICTOR_DATA_DIR \
+  --as-of YYYY-MM-DD --league-list-as-of YYYY-MM-DD
 python scripts/simulate_auction_propensity.py --season 2627 --from-matchday N+1 \
   --matchdays 8 --simulations 10000 --seed 20260922 --as-of <date of N+1> \
   --output $SEASON/outputs/auction_propensity_2627_after_mdN_coach.csv

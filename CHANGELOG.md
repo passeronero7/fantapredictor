@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed (24 September 2026: league-list refresh)
+
+- The snapshot import report and auction dossier accept the date of the
+  private league export. They no longer label every refreshed list as the
+  5 September export.
+
 ### Added
 
 - Added a complete Classic auction-roster MILP optimizer (3P/8D/8C/6A,
