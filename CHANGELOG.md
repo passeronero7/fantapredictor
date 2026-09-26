@@ -13,6 +13,11 @@
   roster that consumes the operational reserve.
 - Add regression tests and document component backtests and remaining limits
   in `docs/auction_forecast_audit.md`.
+- The live planner absorbs only solver infeasibility (`InfeasibleRosterError`)
+  when tightening the budget or searching a break-even bid; any other error
+  now surfaces instead of silently zeroing the credit value.
+- Remove a duplicated copy of this section that had overwritten the
+  2026-08-24 heading further down.
 
 ### Fixed (24 September 2026: league-list refresh)
 
@@ -433,19 +438,7 @@ document for the full design record and acceptance criteria).
 
 All notable project changes are recorded here.
 
-## [Unreleased]
-
-### Fixed (26 September 2026: pre-auction audit)
-
-- Preserve fantasy maluses; regularize sparse paired bootstrap samples with
-  six role-prior appearances and use validated recent appearance estimates.
-- Use complete warehouse fixtures in the auction forecast, filter direct
-  observation channels at the cutoff and use club dates for injury returns.
-- Apply current Classic roles and precompute matchup multipliers.
-- Keep live plans usable at minimum spend and after completing a legal
-  roster that consumes the operational reserve.
-- Add regression tests and document component backtests and remaining limits
-  in `docs/auction_forecast_audit.md`. - 2026-08-24
+## [Unreleased] - 2026-08-24
 
 ### Added
 

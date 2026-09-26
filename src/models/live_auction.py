@@ -34,6 +34,7 @@ from src.models.auction_optimizer import (
     DEPTH_WEIGHTS,
     MODIFIER_SLOT_WEIGHTS,
     AuctionOptimizationConfig,
+    InfeasibleRosterError,
     ROSTER_SLOTS,
     _Model,
     prepare_pool,
@@ -332,7 +333,7 @@ class LivePlanner:
             while step >= 1:
                 try:
                     tighter, _ = context.solve(cap=used - step)
-                except ValueError:
+                except InfeasibleRosterError:
                     step = int(step // 2)
                     continue
                 credit_value = max((base_value - tighter) / step, 1e-9)
@@ -431,7 +432,7 @@ class LivePlanner:
             trial[p] = price
             try:
                 return context.solve(forced=[p], costs=trial)[0] - without_value
-            except ValueError:  # over budget at this price
+            except InfeasibleRosterError:  # over budget at this price
                 return -np.inf
 
         lo = (ref, gap) if gap >= 0 else None   # f >= 0 here: buying is worth it

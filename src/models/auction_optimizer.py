@@ -32,6 +32,10 @@ MODIFIER_SLOT_WEIGHTS = {("P", 1): 1.0, ("D", 1): 1.0, ("D", 2): 1.0, ("D", 3): 
 MIP_REL_GAP = 1e-9
 
 
+class InfeasibleRosterError(ValueError):
+    """The solver found no legal roster under the current bounds and budget."""
+
+
 @dataclass(frozen=True)
 class AuctionOptimizationConfig:
     budget: int = 500
@@ -180,7 +184,7 @@ class _Model:
             options={"time_limit": 60.0, "mip_rel_gap": MIP_REL_GAP},
         )
         if not solution.success or solution.x is None:
-            raise ValueError(f"No legal roster found: {solution.message}")
+            raise InfeasibleRosterError(f"No legal roster found: {solution.message}")
         return [self.variables[int(v)] for v in np.flatnonzero(solution.x > 0.5)]
 
     def result(self, assignment: list[tuple[int, int]], costs: np.ndarray | None = None) -> dict:

@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 import pandas as pd
@@ -8,12 +9,14 @@ import pandas as pd
 from scripts.live_auction import parse_sale, write_state
 from src.models.auction_optimizer import (
     AuctionOptimizationConfig,
+    InfeasibleRosterError,
     ROSTER_SLOTS,
     _Model,
     prepare_pool,
 )
 from src.models.live_auction import (
     LivePlanner,
+    _Context,
     dominance_prune,
     manager_summary,
     market_factor,
@@ -150,6 +153,23 @@ class LivePlannerTests(unittest.TestCase):
         planner = LivePlanner(pool, AuctionOptimizationConfig(budget=25), market_scaling=False)
         plan = planner.plan(pd.DataFrame(columns=["giocatore", "acquirente", "prezzo"]))
         self.assertEqual(plan.roster.crediti.sum(), 25)
+
+    def test_only_infeasibility_is_absorbed_when_tightening_the_budget(self):
+        pool = build_pool(4, per_role=20)
+        planner = LivePlanner(pool, AuctionOptimizationConfig(budget=500, reserve=10),
+                              market_scaling=False)
+        empty = pd.DataFrame(columns=["giocatore", "acquirente", "prezzo"])
+        solve = _Context.solve
+
+        def failing(self, *args, cap=None, **kwargs):
+            if cap is not None:
+                raise ValueError("unrelated solver failure")
+            return solve(self, *args, **kwargs)
+
+        with mock.patch.object(_Context, "solve", failing):
+            with self.assertRaisesRegex(ValueError, "unrelated"):
+                planner.plan(empty)
+        self.assertTrue(issubclass(InfeasibleRosterError, ValueError))
 
     def setUp(self):
         self.config = AuctionOptimizationConfig(budget=500, reserve=10)
