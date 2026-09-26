@@ -4,7 +4,8 @@ An evidence-led probabilistic prediction and research engine for Serie A Fantaca
 
 ## Current state
 
-The 24 September 2026 refresh is documented in
+The 26 September 2026 audit and forecast corrections are documented in
+[`docs/auction_forecast_audit.md`](docs/auction_forecast_audit.md). The latest refresh is documented in
 [`docs/auction_refresh.md`](docs/auction_refresh.md). The private warehouse
 holds all 380 scheduled fixtures, 1,590 observed ratings through matchday 5
 (complete), matchday-6 probable XIs, 598 quotations (matching the private

@@ -132,6 +132,25 @@ class PruningTests(unittest.TestCase):
 
 
 class LivePlannerTests(unittest.TestCase):
+    def test_completed_roster_can_consume_the_reserve(self):
+        pool = build_pool(4, per_role=20)
+        picked = pd.concat([pool[pool.role.eq(role)].head(n)
+                            for role, n in ROSTER_SLOTS.items()])
+        state = pd.DataFrame({"giocatore": picked.player, "acquirente": "io", "prezzo": 20})
+        planner = LivePlanner(pool, AuctionOptimizationConfig(budget=500, reserve=10),
+                              market_scaling=False)
+        plan = planner.plan(state)
+        self.assertEqual(plan.my_budget_left, 0)
+        self.assertEqual(plan.my_max_bid, 0)
+        self.assertTrue(plan.roster.stato.eq("preso").all())
+
+    def test_minimum_cost_roster_does_not_require_a_cheaper_plan(self):
+        pool = build_pool(4, per_role=20)
+        pool["auction_cost"] = 1
+        planner = LivePlanner(pool, AuctionOptimizationConfig(budget=25), market_scaling=False)
+        plan = planner.plan(pd.DataFrame(columns=["giocatore", "acquirente", "prezzo"]))
+        self.assertEqual(plan.roster.crediti.sum(), 25)
+
     def setUp(self):
         self.config = AuctionOptimizationConfig(budget=500, reserve=10)
         self.pool = build_pool(4, per_role=20)

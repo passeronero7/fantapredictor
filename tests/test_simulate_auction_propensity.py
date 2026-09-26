@@ -1,8 +1,29 @@
 import unittest
+import sqlite3
+from datetime import date
 
 import pandas as pd
 
 from scripts.simulate_auction_propensity import NON_TITOLAR_FACTOR, formation_factors
+from scripts.simulate_auction_propensity import club_horizon_dates, calendar_availability_factor
+
+
+class ClubCalendarTests(unittest.TestCase):
+    def test_return_between_early_and_late_fixtures_uses_the_players_club(self):
+        with sqlite3.connect(":memory:") as conn:
+            conn.executescript("""
+                CREATE TABLE seasons(id INTEGER, name TEXT);
+                CREATE TABLE clubs(id INTEGER, name TEXT);
+                CREATE TABLE matches(season_id INTEGER,matchday INTEGER,match_date TEXT,
+                                     home_club_id INTEGER,away_club_id INTEGER);
+                INSERT INTO seasons VALUES (1,'2026/27');
+                INSERT INTO clubs VALUES (1,'Early'),(2,'Late'),(3,'A'),(4,'B');
+                INSERT INTO matches VALUES (1,6,'2026-10-10',1,3),(1,6,'2026-10-12',2,4);
+            """)
+            dates = club_horizon_dates(conn, "2026/27", 6, 1)
+        self.assertEqual(dates["Early"], [date(2026, 10, 10)])
+        self.assertEqual(calendar_availability_factor("2026-10-11", dates["Early"]), 0)
+        self.assertEqual(calendar_availability_factor("2026-10-11", dates["Late"]), 1)
 
 
 class FormationFactorTests(unittest.TestCase):

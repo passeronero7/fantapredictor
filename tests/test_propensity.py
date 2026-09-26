@@ -80,6 +80,14 @@ class ClubStyleIndexTests(unittest.TestCase):
 
 
 class PlayerPropensityTests(unittest.TestCase):
+    def test_current_starter_recovers_from_historical_reserve_status(self):
+        prior = build_ratings(season="2024/25", matchdays=2)
+        current = build_ratings(season="2025/26", matchdays=5)
+        stats = pd.concat([build_team_stats("2024/25", 38), build_team_stats("2025/26", 5)])
+        profile = player_propensity(pd.concat([prior, current]), stats, "2025/26", 6).set_index("player_normalized")
+        self.assertGreater(profile.at["star", "p_plays"], profile.at["star", "p_plays_career"])
+        self.assertAlmostEqual(profile.at["star", "p_plays"], (5 + 3 * 2 / 38) / 8)
+
     def test_probability_columns_are_bounded(self):
         frame = build_propensity_frame()
         self.assertTrue((frame["p_good_mark"] >= 0).all() and (frame["p_good_mark"] <= 1).all())
@@ -121,6 +129,42 @@ class StyleMultiplierTests(unittest.TestCase):
 
 
 class SimulateHorizonTests(unittest.TestCase):
+    def test_negative_fantasy_events_are_preserved(self):
+        from src.models.propensity import _per_player_samples
+        history = build_ratings()
+        history["vote"] = 6.0
+        history["fantavoto"] = 4.5
+        votes, bonuses, _, _ = _per_player_samples(history, build_propensity_frame())
+        self.assertTrue(np.all(votes + bonuses == 4.5))
+
+    def test_small_sample_is_pulled_towards_role_distribution(self):
+        from src.models.propensity import _per_player_samples
+        history = build_ratings(matchdays=20)
+        history["fantavoto"] = 6.0
+        star = history[history.player_normalized.eq("star")].head(4).copy()
+        star["fantavoto"] = 12.0
+        history = pd.concat([history[~history.player_normalized.eq("star")], star])
+        profile = build_propensity_frame().query("player_normalized == 'star'")
+        votes, bonuses, _, _ = _per_player_samples(history, profile, prior_weight=6)
+        self.assertGreater((votes + bonuses).mean(), 7.5)
+        self.assertLess((votes + bonuses).mean(), 9.5)
+
+    def test_calendar_is_validated_and_opponents_change_forecast(self):
+        frame = build_propensity_frame()
+        clubs = sorted(frame.team.unique())
+        style = club_style_index(build_team_stats())
+        style["defense_index"] = style.team.map({"Alpha": 0, "Beta": 8, "Delta": -8, "Gamma": 0})
+        config = SimulationConfig(from_matchday=7, matchdays=1, simulations=200, seed=9)
+        fixtures = pd.DataFrame([{"matchday": 7, "home": "Alpha", "away": "Beta"},
+                                 {"matchday": 7, "home": "Delta", "away": "Gamma"}])
+        hard = simulate_horizon(frame, build_ratings(), style, clubs, config, fixtures)
+        easy_fixtures = fixtures.replace({"Beta": "Delta", "Delta": "Beta"})
+        easy = simulate_horizon(frame, build_ratings(), style, clubs, config, easy_fixtures)
+        self.assertGreater(easy.set_index("player_normalized").at["star", "expected_fantavoto"],
+                           hard.set_index("player_normalized").at["star", "expected_fantavoto"])
+        with self.assertRaisesRegex(ValueError, "calendar"):
+            simulate_horizon(frame, build_ratings(), style, clubs, config, fixtures.head(1))
+
     def test_simulation_is_deterministic_for_a_seed(self):
         frame = build_propensity_frame()
         style = club_style_index(build_team_stats())

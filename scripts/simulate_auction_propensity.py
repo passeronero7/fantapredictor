@@ -167,6 +167,36 @@ def horizon_match_dates(conn, season_name: str, from_matchday: int, matchdays: i
     return [date.fromisoformat(r[1]) for r in rows if r[1]]
 
 
+def horizon_fixtures(conn, season_name: str, from_matchday: int, matchdays: int) -> pd.DataFrame:
+    """Calendar pairings; exact duplicate provider fixtures count once.
+
+    Conflicting pairings fail validation in simulate_horizon instead of
+    silently reverting to random opponents.
+    """
+    return pd.read_sql_query(
+        """SELECT DISTINCT m.matchday, h.name AS home, a.name AS away
+           FROM matches m JOIN seasons s ON s.id=m.season_id
+           JOIN clubs h ON h.id=m.home_club_id JOIN clubs a ON a.id=m.away_club_id
+           WHERE s.name=? AND m.matchday BETWEEN ? AND ?
+           ORDER BY m.matchday, h.name""", conn,
+        params=(season_name, from_matchday, from_matchday + matchdays - 1),
+    )
+
+
+def club_horizon_dates(conn, season_name: str, from_matchday: int, matchdays: int) -> dict[str, list[date]]:
+    """Actual match date for each club, including anticipi/posticipi."""
+    rows = pd.read_sql_query(
+        """SELECT c.name AS club, m.matchday, MIN(date(m.match_date)) AS day
+           FROM matches m JOIN seasons s ON s.id=m.season_id
+           JOIN clubs c ON c.id=m.home_club_id OR c.id=m.away_club_id
+           WHERE s.name=? AND m.matchday BETWEEN ? AND ?
+           GROUP BY c.name,m.matchday ORDER BY c.name,m.matchday""", conn,
+        params=(season_name, from_matchday, from_matchday + matchdays - 1),
+    )
+    return {club: [date.fromisoformat(d) for d in block.day if d]
+            for club, block in rows.groupby("club")}
+
+
 def run_forecast(
     conn,
     season: str,
@@ -183,6 +213,13 @@ def run_forecast(
 
     votes, team_stats, rosters = load_frames(conn, season)
     season_name = season_label(season)
+    # All forecast channels must share the same observation cutoff.
+    # Filtering only player_propensity left future marks in the bootstrap
+    # and future team results in style estimates during historical runs.
+    votes = votes[(votes["season"] < season_name) | (
+        votes["season"].eq(season_name) & (votes["matchday"] < from_matchday))].copy()
+    team_stats = team_stats[(team_stats["season"] < season_name) | (
+        team_stats["season"].eq(season_name) & (team_stats["matchday"] < from_matchday))].copy()
     style_all = club_style_index(team_stats)
     # The current season may lack team stats (Understat-only snapshot): fall
     # back to each club's latest observed season attitude.
@@ -274,6 +311,9 @@ def run_forecast(
 
     prices_frame = repository.load_prices(conn, season)
     prices_frame = prices_frame[prices_frame["fuori_lista"].fillna(0).eq(0)].copy()
+    # Current Classic roles are authoritative even after a summer role change.
+    current_roles = prices_frame.set_index("player_normalized")["role_classic"]
+    propensity["role"] = propensity["player_normalized"].map(current_roles).fillna(propensity["role"])
     # Official probable-formations conditioning: titolars keep their
     # appearance estimate, everyone else is scaled by NON_TITOLAR_FACTOR.
     formation_path = config.get_season_dir(season) / "coaches" / "probable_formations_2026_27.csv"
@@ -302,6 +342,8 @@ def run_forecast(
         "JOIN players p ON p.id = a.player_id", conn)
     horizon_start = as_of or date.today()
     horizon_dates = horizon_match_dates(conn, season_name, from_matchday, matchdays)
+    dates_by_club = club_horizon_dates(conn, season_name, from_matchday, matchdays)
+    club_of = propensity.set_index("player_normalized")["team"].to_dict()
     propensity["availability_structured"] = False
     if not avail.empty:
         horizon_days = matchdays * 7
@@ -316,7 +358,9 @@ def run_forecast(
         # "matchdays x 7 days from as_of"; fall back to it without a calendar.
         if len(horizon_dates) == matchdays:
             factors = {
-                row["key"]: calendar_availability_factor(row["expected_return"], horizon_dates)
+                row["key"]: calendar_availability_factor(
+                    row["expected_return"],
+                    dates_by_club.get(club_of.get(row["key"]), horizon_dates))
                 for _, row in dated.iterrows()
             }
             print(f"availability horizon from calendar: {horizon_dates[0]} .. {horizon_dates[-1]}")
@@ -353,7 +397,10 @@ def run_forecast(
         priced = priced[priced["team"].isin(clubs)].copy()
     if len(clubs) % 2 != 0:
         raise ValueError(f"Club pairing needs an even club list, got {len(clubs)}")
-    result = simulate_horizon(priced, votes, style, clubs, sim_config)
+    fixtures = horizon_fixtures(conn, season_name, from_matchday, matchdays)
+    result = simulate_horizon(priced, votes, style, clubs, sim_config, fixtures=fixtures)
+    result["history_appearances"] = priced.reset_index(drop=True)["appearances"]
+    result["calendar_mode"] = "warehouse_fixtures"
     result = result.merge(
         priced[["player_normalized", "price", "fvm", "availability_structured",
                 "coach", "coach_module", "goal_mult", "assist_mult"]],

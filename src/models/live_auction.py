@@ -266,7 +266,10 @@ class _Context:
         self.model = _Model(self.frame, config)
         self.owned = [self.position[o] for o in owned]
         self.costs = self.frame["auction_cost"].to_numpy(float)
-        self.spend_cap = config.budget - config.reserve
+        # The reserve is a planning buffer; confirmed legal purchases can
+        # consume it. Always leave at least one credit per remaining slot.
+        self.spend_cap = max(config.budget - config.reserve,
+                             int(mine["prezzo"].sum()) + sum(self.open_slots.values()))
         self._utility = self.frame["utility"].to_numpy(float)
         self._premium = self.frame["modifier_premium"].to_numpy(float)
 
@@ -308,6 +311,7 @@ class LivePlanner:
 
     def _context(self, state: pd.DataFrame, keep: set[int] = frozenset()):
         sales = resolve_state(state, self.full)
+        manager_summary(sales, self.me, self.managers, self.config.budget)
         signature = (tuple(map(tuple, state.astype(str).to_numpy())), frozenset(keep))
         if signature in self._cache:
             return self._cache[signature]
@@ -321,8 +325,18 @@ class LivePlanner:
         used = float(context.costs[[p for p, _ in assignment]].sum())
         still_to_spend = used - float(context.costs[context.owned].sum())
         step = max(5.0, round(0.05 * still_to_spend))
-        tighter, _ = context.solve(cap=used - step)
-        credit_value = max((base_value - tighter) / step, 1e-9)
+        credit_value = 1e-9
+        if sum(context.open_slots.values()):
+            # At the end of an auction even a one-credit reduction may be
+            # infeasible. That is a valid completed/minimum-cost plan.
+            while step >= 1:
+                try:
+                    tighter, _ = context.solve(cap=used - step)
+                except ValueError:
+                    step = int(step // 2)
+                    continue
+                credit_value = max((base_value - tighter) / step, 1e-9)
+                break
         result = (sales, context, base_value, assignment, credit_value)
         if len(self._cache) > 8:
             self._cache.clear()

@@ -149,12 +149,15 @@ def player_propensity(
     ``matchday`` of ``season`` are excluded here as well, so callers cannot
     leak the target round by passing an unfiltered frame.
     """
-    observed = ratings.dropna(subset=["vote"]).copy()
+    observed = ratings.dropna(subset=["vote"]).reset_index(drop=True).copy()
     if "season" not in observed or "matchday" not in observed:
         raise ValueError("Ratings frame must carry season and matchday columns")
     current = observed["season"].astype(str).eq(season)
     matchdays = pd.to_numeric(observed["matchday"], errors="coerce")
-    prior = observed[~current | (current & (matchdays < matchday))]
+    prior = observed[observed["season"].astype(str).lt(season) | (current & (matchdays < matchday))].copy()
+    team_stats = team_stats[team_stats["season"].astype(str).lt(season) | (
+        team_stats["season"].astype(str).eq(season)
+        & (pd.to_numeric(team_stats["matchday"], errors="coerce") < matchday))].copy()
 
     style = club_style_index(team_stats)
     club_games = style.set_index(["season", "team"])["games"]
@@ -209,6 +212,25 @@ def player_propensity(
         profile["appearances"] + shrinkage * profile["role"].map(role_appearance_prior) * 4
     ) / (games_per_player.reindex(profile.index).fillna(0) + shrinkage * 4)
     profile["p_plays"] = profile["p_plays"].clip(0.0, 1.0)
+    profile["p_plays_career"] = profile["p_plays"]
+    # Current usage matters more than years spent as a reserve or a January
+    # arrival. Walk-forward G6-G13 checks select three prior games; see
+    # docs/auction_forecast_audit.md. No future appearances enter this rate.
+    current_marks = prior[prior["season"].eq(season)]
+    current_games = team_stats[team_stats["season"].eq(season)].groupby("team").size()
+    if not current_games.empty:
+        year = int(season[:4])
+        previous_season = f"{year - 1}/{str(year)[-2:]}"
+        previous_marks = prior[prior["season"].eq(previous_season)]
+        previous_apps = previous_marks.groupby("player_normalized").size()
+        previous_rounds = team_stats[team_stats["season"].eq(previous_season)]["matchday"].nunique()
+        role_prior = profile.groupby("role")["p_plays_career"].mean()
+        previous_rate = (previous_apps / max(previous_rounds, 1)).reindex(profile.index)
+        previous_rate = previous_rate.fillna(profile["role"].map(role_prior)).clip(0, 1)
+        current_apps = current_marks.groupby("player_normalized").size().reindex(profile.index, fill_value=0)
+        games = profile["team"].map(current_games)
+        recent = (current_apps + 3.0 * previous_rate) / (games + 3.0)
+        profile["p_plays"] = recent.fillna(profile["p_plays_career"]).clip(0, 1)
     return profile.reset_index().rename(columns={"index": "player_normalized"})
 
 
@@ -252,6 +274,7 @@ class SimulationConfig:
     good_mark: float = GOOD_VOTE_THRESHOLD
     style_weight: float = 0.15
     seed: int = 20260903
+    bootstrap_prior_weight: float = 6.0
 
 
 GOAL_BONUS = 3.0
@@ -259,22 +282,22 @@ ASSIST_BONUS = 1.0
 
 
 def _per_player_samples(
-    prior: pd.DataFrame, propensity: pd.DataFrame, min_obs: int = 3
+    prior: pd.DataFrame, propensity: pd.DataFrame, min_obs: int = 3,
+    prior_weight: float = 6.0,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Fixed-width bootstrap matrices of vote and bonus per player.
 
-    Players with fewer than ``min_obs`` observations fall back to their role
-    distribution. Returns ``(votes, bonuses, nonzero_bonus_rate, mean_bonus)``
+    Paired observations are mixed with the role distribution using
+    ``prior_weight`` prior appearances. With weight zero, the legacy
+    ``min_obs`` fallback applies. Returns ``(votes, bonuses, nonzero_bonus_rate, mean_bonus)``
     shaped ``(n_players, width)`` plus the players' index labels.
 
     When ``propensity`` carries ``goal_mult``/``assist_mult`` (coach
     context), the goal and assist part of every sampled bonus is rescaled:
     ``bonus + (goal_mult - 1) * 3 * goals + (assist_mult - 1) * assists``.
     """
-    observed = prior.dropna(subset=["vote"]).copy()
-    observed["bonus"] = (
-        observed["fantavoto"] - observed["vote"]
-    ).clip(lower=0)
+    observed = prior.dropna(subset=["vote", "fantavoto"]).copy()
+    observed["bonus"] = observed["fantavoto"] - observed["vote"]
     for column in ("goals", "assists"):
         if column not in observed:
             observed[column] = 0.0
@@ -290,22 +313,36 @@ def _per_player_samples(
     for position, (_, row) in enumerate(propensity.iterrows()):
         key = str(row["player_normalized"])
         block = observed[observed["player_normalized"].eq(key)]
-        if len(block) < min_obs:
-            block = role_pool.get(str(row["role"]), observed)
+        pool = role_pool.get(str(row["role"]), observed)
+        if pool.empty:
+            raise ValueError("No observed vote/fantavoto pairs for bootstrap")
+        # Mix paired observations, preserving vote/bonus dependence and all
+        # maluses. Six prior appearances regularize small samples smoothly;
+        # the old hard cutoff gave a four-appearance hot streak full weight.
+        own_weight = len(block) / (len(block) + prior_weight) if len(block) else 0.0
+        if prior_weight == 0 and len(block) < min_obs:
+            own_weight = 0.0
+        width = 2048
+        own_count = int(round(width * own_weight))
+        parts = []
+        if own_count:
+            parts.append(block.iloc[rng.integers(0, len(block), own_count)])
+        if own_count < width:
+            parts.append(pool.iloc[rng.integers(0, len(pool), width - own_count)])
+        block = pd.concat(parts, ignore_index=True)
         bonus = (
             block["bonus"].to_numpy(dtype=float)
             + (goal_mult[position] - 1.0) * GOAL_BONUS * block["goals"].to_numpy(dtype=float)
             + (assist_mult[position] - 1.0) * ASSIST_BONUS * block["assists"].to_numpy(dtype=float)
         )
         votes.append(block["vote"].to_numpy(dtype=float))
-        bonuses.append(np.clip(bonus, 0.0, None))
+        bonuses.append(bonus)
     width = max(len(v) for v in votes)
     vote_matrix = np.full((len(votes), width), np.nan)
     bonus_matrix = np.full((len(votes), width), np.nan)
     for index, (v, b) in enumerate(zip(votes, bonuses)):
-        take = rng.integers(0, len(v), size=width)
-        vote_matrix[index] = v[take]
-        bonus_matrix[index] = b[take]
+        vote_matrix[index] = v
+        bonus_matrix[index] = b
     nonzero_rate = np.array([
         float((b >= 1).mean()) for b in bonuses
     ])
@@ -321,18 +358,21 @@ def simulate_horizon(
     style: pd.DataFrame,
     clubs: list[str],
     config: SimulationConfig,
+    fixtures: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Monte Carlo the forecast horizon and return per-player propensity.
 
-    Each simulation round pairs the 20 clubs randomly each matchday (the
-    official future calendar is not yet ingested; random pairing is the
-    documented assumption). For every player-matchday: Bernoulli appearance,
+    Supplied calendar pairings are validated and used in every draw. Only
+    callers without fixtures use random pairings. For every player-matchday:
+    Bernoulli appearance,
     bootstrap vote, and bonus events accepted with probability modulated by
     the club/opponent style multiplier. The auction statistic is
-    P(median fantavoto over the horizon >= good_mark).
+    P(median base vote over the horizon >= good_mark).
     """
     rng = np.random.default_rng(config.seed)
-    votes, bonuses, _, _ = _per_player_samples(prior, propensity)
+    votes, bonuses, _, _ = _per_player_samples(
+        prior, propensity, prior_weight=config.bootstrap_prior_weight
+    )
     propensity = propensity.reset_index(drop=True)
     style_by_team = style.set_index("team")
     own_attack = propensity["team"].map(style_by_team["attack_index"]).fillna(0.0).to_numpy()
@@ -350,31 +390,48 @@ def simulate_horizon(
     p_plays = propensity["p_plays"].fillna(0.0).to_numpy()
     roles = propensity["role"].astype(str).to_numpy()
     teams = propensity["team"].astype(str).to_numpy()
+    schedule = []
+    if fixtures is not None:
+        for md in range(config.from_matchday, config.from_matchday + config.matchdays):
+            games = fixtures[fixtures["matchday"].eq(md)]
+            sides = games["home"].tolist() + games["away"].tolist()
+            if len(sides) != len(clubs) or set(sides) != set(clubs):
+                raise ValueError(f"Incomplete or ambiguous calendar at matchday {md}")
+            opponent_of = dict(zip(games["home"], games["away"]))
+            opponent_of.update(zip(games["away"], games["home"]))
+            schedule.append(opponent_of)
+    # Calculate each possible matchup once instead of a Python call per
+    # player per draw. This preserves the existing style acceptance rule.
+    matchup = {
+        club: np.array([
+            style_multiplier(roles[i], own_attack[i], own_defense[i],
+                             opp_attack[club], opp_defense[club], config.style_weight)
+            for i in range(n_players)
+        ]) for club in clubs
+    }
+    scheduled_multipliers = [np.array([matchup[opponents[team]][i]
+                                      for i, team in enumerate(teams)])
+                             for opponents in schedule]
     for sim in range(config.simulations):
         horizon_marks = np.full((n_players, config.matchdays), np.nan)
         vote_marks = np.full((n_players, config.matchdays), np.nan)
         for md in range(config.matchdays):
-            pairing = rng.permutation(len(clubs)).reshape(-1, 2)
-            opponent_of = {}
-            for home_idx, away_idx in pairing:
-                opponent_of[clubs[home_idx]] = clubs[away_idx]
-                opponent_of[clubs[away_idx]] = clubs[home_idx]
-            opponents = np.array([opponent_of.get(team, team) for team in teams])
-            o_attack = np.array([opp_attack.get(team, 0.0) for team in opponents])
-            o_defense = np.array([opp_defense.get(team, 0.0) for team in opponents])
+            if schedule:
+                multiplier = scheduled_multipliers[md]
+            else:
+                pairing = rng.permutation(len(clubs)).reshape(-1, 2)
+                opponent_of = {}
+                for home_idx, away_idx in pairing:
+                    opponent_of[clubs[home_idx]] = clubs[away_idx]
+                    opponent_of[clubs[away_idx]] = clubs[home_idx]
+                multiplier = np.array([matchup[opponent_of[team]][i]
+                                       for i, team in enumerate(teams)])
 
             plays = rng.random(n_players) < p_plays
             sample_idx = rng.integers(0, votes.shape[1], size=n_players)
             draw_votes = votes[np.arange(n_players), sample_idx]
             draw_bonus = bonuses[np.arange(n_players), sample_idx]
             has_bonus = draw_bonus >= 1
-            multiplier = np.array([
-                style_multiplier(
-                    roles[i], own_attack[i], own_defense[i], o_attack[i], o_defense[i],
-                    weight=config.style_weight,
-                )
-                for i in range(n_players)
-            ])
             accept = ~has_bonus | (rng.random(n_players) < np.minimum(1.0, multiplier))
             fantavoto = draw_votes + np.where(accept, draw_bonus, 0.0)
             fantavoto = np.where(plays, fantavoto, np.nan)
