@@ -121,6 +121,14 @@ python scripts/live_auction_web.py --forecast /path/to/forecast.csv \
 Mutations require the per-startup token embedded in the page plus the
 expected origin; console and web share a `StateLock` on the state file, so
 only one process can write the log at a time.
+The server accepts only loopback bindings and checks the request Host.
+Idle browser connections are handled independently; a shared lock keeps
+planner calls and mutations serial. Sales and undo are calculated before
+the CSV is committed, so calculation failures preserve the previous state.
+After a sale, undo or refresh the old player quote is hidden; select the
+player again for a current bid. Search accepts names, clubs and official IDs.
+UI regression checks execute the shipped JavaScript with Node when available;
+Node is not required to run the web console.
 
 `optimize_auction_roster.py --state stato_asta.csv` writes the same residual
 plan, bids and manager table as files. See `docs/auction_refresh.md`

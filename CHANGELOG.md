@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Fixed (26 September 2026: web console final audit)
+
+- Handle browser connections independently with timeouts and closed responses,
+  while serializing planner/state operations with a shared lock.
+- Solve candidate sales and undo before committing CSV or in-memory state in
+  web and CLI. Failed planning and disk writes leave the prior state intact.
+- Invalidate displayed bids after state changes and reject late bid responses;
+  prevent repeated mutation clicks, reject fractional prices, escape buyer
+  options and honor the configured manager name.
+- Enforce loopback binding and Host validation, reject invalid body framing,
+  disable response caching, and surface unexpected runtime errors as HTTP 500.
+- Search player names, clubs and official IDs. Add HTTP concurrency, rollback,
+  request-guard and executable JavaScript regression checks.
+
 ### Fixed (26 September 2026: pre-auction audit)
 
 - Preserve fantasy maluses; regularize sparse paired bootstrap samples with

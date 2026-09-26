@@ -187,8 +187,10 @@ def main() -> None:
                     show_bid(planner, state, " ".join(rest))
                 elif verb in {"m", "v"}:
                     sale = parse_sale(rest, verb == "m", args.me)
-                    state, canonical = record_sale(planner, state, sale)
-                    write_state(state, args.state)
+                    candidate, canonical = record_sale(planner, state, sale)
+                    planner.plan(candidate)
+                    write_state(candidate, args.state)
+                    state = candidate
                     print(f"registrato: {canonical['giocatore']} a {canonical['acquirente']} "
                           f"per {canonical['prezzo']}")
                     current = show_plan(planner, state, current)
@@ -196,8 +198,10 @@ def main() -> None:
                     if state.empty:
                         print("niente da annullare")
                         continue
-                    state, last = undo_last(planner, state)
-                    write_state(state, args.state)
+                    candidate, last = undo_last(planner, state)
+                    planner.plan(candidate)
+                    write_state(candidate, args.state)
+                    state = candidate
                     print(f"annullato: {last['giocatore']} ({last['acquirente']}, {last['prezzo']})")
                     current = show_plan(planner, state, current)
                 elif verb == "p":

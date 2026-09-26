@@ -9,9 +9,9 @@ random token plus the expected origin. The auction state is rewritten
 atomically and guarded by the same ``StateLock`` the CLI holds, so console
 and web can never write the log at the same time.
 
-Requests are handled by a single-threaded ``HTTPServer``: planning and MILP
-solves mutate the planner context and are not thread-safe, and one operator
-is the intended audience.
+Connections run independently so idle browser sockets cannot block the UI.
+A shared operation lock serializes planning and mutations: MILP contexts
+are mutable and must never be used concurrently.
 """
 
 from __future__ import annotations
@@ -23,8 +23,9 @@ import secrets
 import sys
 import traceback
 from datetime import datetime, timezone
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import RLock
 from urllib.parse import parse_qs, urlparse
 
 import pandas as pd
@@ -33,6 +34,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts.live_auction import make_planner, write_state
+from src.models.auction_optimizer import InfeasibleRosterError
 from src.models.live_auction import (
     _key,
     LivePlanner,
@@ -49,22 +51,26 @@ TOKEN_HEADER = "X-Auction-Token"
 SERVER_NAME = "FantaPredictorAuctionWeb/1.0"
 
 
-class AuctionWebServer(HTTPServer):
+class AuctionWebServer(ThreadingHTTPServer):
     """HTTPServer carrying the planner, state and per-startup security token."""
+
+    # server_close must finish pending writes before main releases StateLock.
+    daemon_threads = False
 
     def __init__(self, planner: LivePlanner, state: pd.DataFrame, state_path: Path,
                  host: str, port: int, token: str):
+        if host not in ("127.0.0.1", "localhost"):
+            raise ValueError("Il server accetta solo 127.0.0.1 o localhost")
+        self.operation_lock = RLock()
         super().__init__((host, port), _AuctionHandler)
         self.planner = planner
         self.state = state
         self.state_path = Path(state_path)
         self.token = token
         self.lock = StateLock(self.state_path)
-        allow_hosts = {host}
-        if host in ("127.0.0.1", "localhost", "::1"):
-            allow_hosts |= {"127.0.0.1", "localhost", "[::1]"}
         bound_port = self.server_address[1]
-        self.allowed_origins = {f"http://{h}:{bound_port}" for h in allow_hosts}
+        self.allowed_hosts = {f"{h}:{bound_port}" for h in ("127.0.0.1", "localhost")}
+        self.allowed_origins = {f"http://{h}" for h in self.allowed_hosts}
 
     @property
     def origin(self) -> str:
@@ -80,12 +86,29 @@ class _AuctionHandler(BaseHTTPRequestHandler):
 
     # -- plumbing ------------------------------------------------------------
 
+    def setup(self) -> None:
+        super().setup()
+        self.connection.settimeout(10)
+
+    def end_headers(self) -> None:
+        self.close_connection = True
+        self.send_header("Connection", "close")
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
+    def _check_host(self) -> bool:
+        hosts = self.headers.get_all("Host", [])
+        if len(hosts) != 1 or hosts[0].lower() not in self.server.allowed_hosts:
+            self._fail(403, "Host non atteso")
+            return False
+        return True
+
     def log_message(self, fmt: str, *args) -> None:
         print(f"{datetime.now().astimezone().isoformat(timespec='seconds')} {self.address_string()} "
               f"{fmt % args}", file=sys.stderr)
 
     def _json(self, status: int, payload: dict) -> None:
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        body = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -102,7 +125,7 @@ class _AuctionHandler(BaseHTTPRequestHandler):
         message = str(exc)
         conflicts = ("Sold twice", "already sold", "more players than slots",
                      "cannot fill", "holds the lock", "niente da annullare")
-        if isinstance(exc, RuntimeError) or any(part in message for part in conflicts):
+        if isinstance(exc, InfeasibleRosterError) or any(part in message for part in conflicts):
             return 409
         return 400
 
@@ -116,20 +139,25 @@ class _AuctionHandler(BaseHTTPRequestHandler):
             self._fail(403, "Origin non atteso")
             return False
         token = self.headers.get(TOKEN_HEADER, "")
-        if not hmac.compare_digest(token, self.server.token):
+        if not hmac.compare_digest(token.encode("utf-8"), self.server.token.encode("utf-8")):
             self.close_connection = True
             self._fail(403, "Token mancante o errato")
             return False
         content_type = self.headers.get("Content-Type", "")
-        if "application/json" not in content_type.lower():
+        if content_type.split(";", 1)[0].strip().lower() != "application/json":
             self.close_connection = True
             self._fail(415, "Content-Type deve essere application/json")
             return False
         length = self.headers.get("Content-Length")
+        if self.headers.get("Transfer-Encoding") or len(self.headers.get_all("Content-Length", [])) > 1:
+            self._fail(400, "Framing del body non valido")
+            return False
         if length is None:
             self._fail(411, "Manca Content-Length")
             return False
         try:
+            if int(length) < 0:
+                raise ValueError
             if int(length) > MAX_BODY:
                 self.close_connection = True
                 self._fail(413, "Body troppo grande")
@@ -152,8 +180,9 @@ class _AuctionHandler(BaseHTTPRequestHandler):
 
     # -- shared payload builders --------------------------------------------
 
-    def _plan_payload(self):
-        state = self.server.state
+    def _plan_payload(self, state=None):
+        if state is None:
+            state = self.server.state
         plan = self.server.planner.plan(state)
         roster = [
             {"role": row["role"], "depth": int(row["depth"]), "player": row["player"],
@@ -180,11 +209,11 @@ class _AuctionHandler(BaseHTTPRequestHandler):
     # -- routes --------------------------------------------------------------
 
     def do_GET(self) -> None:  # noqa: N802
-        path = urlparse(self.path).path
-        if path == "/":
-            self._serve_page()
+        if not self._check_host():
             return
+        path = urlparse(self.path).path
         route = {
+            "/": self._serve_page,
             "/api/health": self._handle_health,
             "/api/plan": self._handle_plan,
             "/api/bid": self._handle_bid,
@@ -195,14 +224,19 @@ class _AuctionHandler(BaseHTTPRequestHandler):
             self._fail(404, "Endpoint sconosciuto")
             return
         try:
-            route()
-        except (KeyError, ValueError, RuntimeError) as exc:
+            with self.server.operation_lock:
+                route()
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
+        except (KeyError, ValueError) as exc:
             self._fail(self._status_for(exc), str(exc))
         except Exception:  # noqa: BLE001 - reply JSON, never leak the traceback
             traceback.print_exc()
             self._fail(500, "internal error")
 
     def do_POST(self) -> None:  # noqa: N802
+        if not self._check_host():
+            return
         path = urlparse(self.path).path.rstrip("/")
         route = {"/api/sale": self._handle_sale, "/api/undo": self._handle_undo}.get(path)
         if route is None:
@@ -211,8 +245,11 @@ class _AuctionHandler(BaseHTTPRequestHandler):
         if not self._check_mutation():
             return
         try:
-            route()
-        except (KeyError, ValueError, RuntimeError) as exc:
+            with self.server.operation_lock:
+                route()
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
+        except (KeyError, ValueError) as exc:
             # Validation runs before any write, so the CSV is untouched.
             self._fail(self._status_for(exc), str(exc))
         except Exception:  # noqa: BLE001 - reply JSON, never leak the traceback
@@ -220,7 +257,9 @@ class _AuctionHandler(BaseHTTPRequestHandler):
             self._fail(500, "internal error")
 
     def _serve_page(self) -> None:
-        body = PAGE_HTML.replace("__TOKEN__", self.server.token).encode("utf-8")
+        body = (PAGE_HTML.replace("__TOKEN__", self.server.token)
+                .replace("__ME__", json.dumps(self.server.planner.me).replace("<", "\\u003c"))
+                .encode("utf-8"))
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -280,9 +319,14 @@ class _AuctionHandler(BaseHTTPRequestHandler):
             return
         pool = self.server.planner.full
         keys = pool["player"].map(_key)
-        prefix = pool.index[keys.str.split().map(
-            lambda parts: any(part.startswith(text) for part in parts))]
-        match = pool.index[keys.str.contains(text, regex=False)]
+        tokens = text.split()
+        prefix = pool.index[keys.map(lambda name: any(
+            len(name.split()[start:]) >= len(tokens) and all(
+                part.startswith(token) for part, token in zip(name.split()[start:], tokens))
+            for start in range(len(name.split()))))]
+        by_id = pd.to_numeric(pool["source_ref"], errors="coerce").eq(int(text)) if text.isdigit() else False
+        match = pool.index[keys.str.contains(text, regex=False)
+                           | pool["team"].map(_key).str.contains(text, regex=False) | by_id]
         order = prefix.tolist() + [i for i in match if i not in set(prefix)]
         rows = []
         for i in order[:20]:
@@ -304,9 +348,7 @@ class _AuctionHandler(BaseHTTPRequestHandler):
             raise ValueError("'price' deve essere un intero >= 1")
         sale = {"giocatore": player.strip(), "acquirente": buyer.strip(), "prezzo": price}
         new_state, canonical = record_sale(self.server.planner, self.server.state, sale)
-        write_state(new_state, self.server.state_path)
-        self.server.state = new_state
-        self._ok({"sale": canonical, "plan": self._plan_payload()})
+        self._commit_state(new_state, "sale", canonical)
 
     def _handle_undo(self) -> None:
         try:
@@ -315,9 +357,16 @@ class _AuctionHandler(BaseHTTPRequestHandler):
             self._fail(400, "Body deve essere un oggetto JSON, anche vuoto ({})")
             return
         new_state, undone = undo_last(self.server.planner, self.server.state)
-        write_state(new_state, self.server.state_path)
-        self.server.state = new_state
-        self._ok({"undone": undone, "plan": self._plan_payload()})
+        self._commit_state(new_state, "undone", undone)
+
+    def _commit_state(self, state: pd.DataFrame, field: str, record: dict) -> None:
+        # Solve and serialize the entire candidate response before committing.
+        # A solver or disk failure leaves both the CSV and in-memory state intact.
+        payload = {field: record, "plan": self._plan_payload(state)}
+        json.dumps(payload, allow_nan=False)
+        write_state(state, self.server.state_path)
+        self.server.state = state
+        self._ok(payload)
 
 
 def now_iso() -> str:
@@ -338,7 +387,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--db", type=Path)
     parser.add_argument("--modifier-season", default="2025/26")
     parser.add_argument("--no-market-scaling", action="store_true")
-    parser.add_argument("--host", default="127.0.0.1", help="Bind address (default 127.0.0.1)")
+    parser.add_argument("--host", default="127.0.0.1", choices=("127.0.0.1", "localhost"),
+                        help="Loopback bind address (default 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8765, help="Listen port (default 8765)")
     return parser.parse_args(argv)
 
@@ -372,7 +422,7 @@ def main(argv: list[str] | None = None) -> None:
         state_lock.release()
 
 
-PAGE_HTML = """<!doctype html>
+PAGE_HTML = r"""<!doctype html>
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -462,8 +512,20 @@ th { color:var(--mut); font-weight:600; }
 </main>
 <script>
 const TOKEN = "__TOKEN__";
+const ME = __ME__;
 let selected = null;
-let buyers = new Set(["io"]);
+let buyers = new Set([ME]);
+let bidVersion = 0;
+let busy = false;
+function invalidateBid() {
+  ++bidVersion; selected = null;
+  document.getElementById("bidcard").classList.add("hidden");
+  for (const id of ["bidinfo", "bidtags", "rivals"]) document.getElementById(id).textContent = "";
+}
+function setBusy(value) {
+  busy = value;
+  for (const id of ["salebtn", "undobtn", "refresh"]) document.getElementById(id).disabled = value;
+}
 function es(s){return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");}
 
 function err(msg) {
@@ -513,30 +575,34 @@ function renderRoster(roster) {
 }
 
 function renderManagers(rows) {
-  buyers = new Set(rows.map(r => r.acquirente));
+  buyers = new Set(rows.map(r => r.acquirente).filter(name => !/^altri \(\d+, nessun acquisto\)$/.test(name)));
   const tb = document.querySelector("#managers tbody");
   tb.innerHTML = rows.map(r => `<tr>
     <td>${es(r.acquirente)}</td><td>${es(r.spesi)}</td><td>${es(r.rimasti)}</td><td>${es(r.slot_aperti)}</td>
     <td>${es(r.aperti_P)}</td><td>${es(r.aperti_D)}</td><td>${es(r.aperti_C)}</td><td>${es(r.aperti_A)}</td>
     <td>${es(r.offerta_max)}</td></tr>`).join("");
   const dl = document.getElementById("buyers");
-  dl.innerHTML = [...buyers].map(b => `<option value="${b}"></option>`).join("");
+  dl.innerHTML = [...buyers].map(b => `<option value="${es(b)}"></option>`).join("");
 }
 
 async function loadPlan() {
+  invalidateBid();
   const p = await get("/api/plan");
   renderStats(p); renderRoster(p.roster); renderManagers(p.managers);
   stamp();
 }
 async function loadBid(player) {
+  invalidateBid();
+  const version = bidVersion;
   const b = await get("/api/bid?player=" + encodeURIComponent(player));
+  if (version !== bidVersion) return;
   selected = {player: b.player, team: b.team, role: b.role};
   document.getElementById("salep").value = b.player;
   document.getElementById("bidcard").classList.remove("hidden");
   document.getElementById("bidinfo").innerHTML =
     `<span class="big">${es(b.player)}</span> <span class="mut">${es(b.team)} · ${es(b.role)}</span>` +
     `<div>riferimento <b>${b.riferimento}</b> · offerta massima <b>${b.offerta_max}</b>` +
-    (b.motivo ? ` <span class="mut">(${b.motivo})</span>` : "") + `</div>` +
+    (b.motivo ? ` <span class="mut">(${es(b.motivo)})</span>` : "") + `</div>` +
     (b.se_lo_perdi ? `<div class="mut">se lo perdi entrano: ${es(b.se_lo_perdi)}</div>` : "");
   document.getElementById("bidtags").innerHTML =
     `<span class="tag">${b.nel_piano ? "nel piano" : "fuori piano"}</span>` +
@@ -548,17 +614,22 @@ async function loadBid(player) {
 }
 
 let timer = null;
+let searchVersion = 0;
 document.getElementById("search").addEventListener("input", ev => {
   clearTimeout(timer);
+  const version = ++searchVersion;
   const q = ev.target.value.trim();
   timer = setTimeout(async () => {
+    try {
     const r = await get("/api/search?q=" + encodeURIComponent(q));
+    if (version !== searchVersion) return;
     const ul = document.getElementById("results");
     ul.innerHTML = r.results.map(x =>
       `<li data-p="${es(x.player)}">
         <span><b>${es(x.player)}</b> <span class="mut">${es(x.team)} · ${es(x.role)}</span></span>
         <span class="mut">id ${es(x.id ?? "—")}</span></li>`).join("");
     if (!r.results.length) ul.innerHTML = `<li class="mut">nessun risultato</li>`;
+    } catch (e) { if (version === searchVersion) err("ricerca: " + e.message); }
   }, 200);
 });
 document.getElementById("results").addEventListener("click", async ev => {
@@ -568,34 +639,48 @@ document.getElementById("results").addEventListener("click", async ev => {
 });
 
 document.getElementById("salebtn").addEventListener("click", async () => {
+  if (busy) return;
   const player = document.getElementById("salep").value.trim();
-  const price = parseInt(document.getElementById("saler").value, 10);
-  const buyer = document.getElementById("saleb").value.trim() || "io";
-  if (!player || !Number.isInteger(price) || price < 1) { err("inserisci giocatore e prezzo intero"); return; }
+  const price = Number(document.getElementById("saler").value);
+  const buyer = document.getElementById("saleb").value.trim() || ME;
+  if (!player || !Number.isSafeInteger(price) || price < 1) { err("inserisci giocatore e prezzo intero"); return; }
   if (!confirm(`Registrare ${player} → ${buyer} per ${price} crediti?`)) return;
+  setBusy(true); invalidateBid();
   try {
     okMsg();
     const d = await post("/api/sale", {player, price, buyer});
+    invalidateBid();
     renderStats(d.plan); renderRoster(d.plan.roster); renderManagers(d.plan.managers);
     document.getElementById("saler").value = "";
+    document.getElementById("salep").value = "";
     stamp();
   } catch (e) { err("vendita: " + e.message); await loadPlan().catch(() => {}); }
+  finally { setBusy(false); }
 });
 
 document.getElementById("undobtn").addEventListener("click", async () => {
+  if (busy) return;
   if (!confirm("Annullare l'ultima aggiudicazione registrata?")) return;
+  setBusy(true); invalidateBid();
   try {
     okMsg();
     const d = await post("/api/undo", {});
+    invalidateBid();
     renderStats(d.plan); renderRoster(d.plan.roster); renderManagers(d.plan.managers);
     stamp();
   } catch (e) { err("annulla: " + e.message); await loadPlan().catch(() => {}); }
+  finally { setBusy(false); }
 });
 
 document.getElementById("refresh").addEventListener("click", async () => {
+  if (busy) return;
+  setBusy(true);
   try { okMsg(); await loadPlan(); } catch (e) { err(e.message); }
+  finally { setBusy(false); }
 });
 
+document.getElementById("salep").addEventListener("input", invalidateBid);
+document.getElementById("saleb").placeholder = `acquirente (${ME})`;
 loadPlan().catch(e => err("avvio: " + e.message));
 </script>
 </body>

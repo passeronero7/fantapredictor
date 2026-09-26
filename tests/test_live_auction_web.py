@@ -1,15 +1,20 @@
 import json
+import http.client
+import socket
 import tempfile
 import threading
+import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import patch
 from urllib import error, request
 
 import numpy as np
 import pandas as pd
 
 from scripts.live_auction_web import AuctionWebServer, main
-from src.models.auction_optimizer import AuctionOptimizationConfig, ROSTER_SLOTS
+from src.models.auction_optimizer import AuctionOptimizationConfig, InfeasibleRosterError, ROSTER_SLOTS
 from src.models.live_auction import LivePlanner, read_state
 from src.utils.state_lock import StateLock
 
@@ -80,6 +85,51 @@ class WebServerCase(unittest.TestCase):
 
 
 class BasicApiTests(WebServerCase):
+    def test_idle_browser_connection_does_not_block_other_clients(self):
+        with socket.create_connection(self.server.server_address, timeout=2):
+            connection = http.client.HTTPConnection(*self.server.server_address, timeout=2)
+            try:
+                connection.request("GET", "/api/health")
+                response = connection.getresponse()
+                self.assertEqual(response.status, 200)
+                self.assertTrue(response.will_close)
+                self.assertEqual(response.getheader("Cache-Control"), "no-store")
+                response.read()
+                self.assertEqual(self.call("GET", "/api/health")[0], 200)
+            finally:
+                connection.close()
+
+    def test_planner_calls_remain_serialized(self):
+        original = self.planner.plan
+        active = 0
+        peak = 0
+        guard = threading.Lock()
+
+        def tracked(state):
+            nonlocal active, peak
+            with guard:
+                active += 1
+                peak = max(peak, active)
+            try:
+                time.sleep(0.1)
+                return original(state)
+            finally:
+                with guard:
+                    active -= 1
+
+        with patch.object(self.planner, "plan", side_effect=tracked):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                futures = [executor.submit(self.call, "GET", "/api/plan") for _ in range(2)]
+                self.assertEqual([future.result()[0] for future in futures], [200, 200])
+        self.assertEqual(peak, 1)
+
+    def test_search_supports_official_id_and_team(self):
+        _, payload = self.call("GET", "/api/search?q=1000")
+        self.assertEqual([row["player"] for row in payload["data"]["results"]], ["P Player0"])
+        _, payload = self.call("GET", "/api/search?q=Club2")
+        self.assertTrue(payload["data"]["results"])
+        self.assertTrue(all(row["team"] == "Club2" for row in payload["data"]["results"]))
+
     def test_health_and_page_work_without_token(self):
         status, payload = self.call("GET", "/api/health")
         self.assertEqual(status, 200)
@@ -134,6 +184,38 @@ class BasicApiTests(WebServerCase):
 
 
 class SaleApiTests(WebServerCase):
+    def test_failed_sale_plan_preserves_csv_and_memory(self):
+        for error, expected in [(InfeasibleRosterError("No legal roster"), 409),
+                                (RuntimeError("private solver details"), 500)]:
+            with self.subTest(error=type(error).__name__):
+                before = self.csv_text()
+                with patch.object(self.planner, "plan", side_effect=error):
+                    status, payload = self.call("POST", "/api/sale",
+                        {"player": "P Player0", "buyer": "io", "price": 5}, token=self.token)
+                self.assertEqual(status, expected)
+                self.assertEqual(self.csv_text(), before)
+                self.assertTrue(self.server.state.empty)
+                if expected == 500:
+                    self.assertEqual(payload["error"], "internal error")
+
+    def test_failed_undo_plan_preserves_existing_sale(self):
+        self.assertEqual(self.call("POST", "/api/sale",
+            {"player": "P Player0", "buyer": "io", "price": 5}, token=self.token)[0], 200)
+        before = self.csv_text()
+        with patch.object(self.planner, "plan", side_effect=InfeasibleRosterError("No legal roster")):
+            self.assertEqual(self.call("POST", "/api/undo", {}, token=self.token)[0], 409)
+        self.assertEqual(self.csv_text(), before)
+        self.assertEqual(len(self.server.state), 1)
+
+    def test_disk_error_does_not_change_in_memory_state(self):
+        before = self.csv_text()
+        with patch("scripts.live_auction_web.write_state", side_effect=OSError("disk full")):
+            status, _ = self.call("POST", "/api/sale",
+                {"player": "P Player0", "buyer": "io", "price": 5}, token=self.token)
+        self.assertEqual(status, 500)
+        self.assertEqual(self.csv_text(), before)
+        self.assertTrue(self.server.state.empty)
+
     def test_mine_sale_updates_csv_and_plan(self):
         ref = int(self.planner.full.iloc[0]["source_ref"])
         status, payload = self.call("POST", "/api/sale",
@@ -206,6 +288,39 @@ class SaleApiTests(WebServerCase):
 
 
 class GuardTests(WebServerCase):
+    def test_host_checked_on_page_reads_and_mutations(self):
+        for path in ("/", "/api/health"):
+            status, payload = self.call("GET", path, headers={"Host": "foreign.example"})
+            self.assertEqual(status, 403)
+            self.assertNotIn(self.token, json.dumps(payload))
+        status, _ = self.call("POST", "/api/sale",
+            {"player": "P Player0", "buyer": "io", "price": 5}, token=self.token,
+            headers={"Host": "foreign.example"})
+        self.assertEqual(status, 403)
+        self.assertTrue(self.server.state.empty)
+
+    def test_body_framing_and_content_type_errors_do_not_hang(self):
+        for headers, expected in [({"Content-Length": "-1"}, 400),
+                                   ({"Content-Length": "invalid"}, 400),
+                                   ({"Transfer-Encoding": "chunked"}, 400),
+                                   ({"Content-Type": "text/application/json"}, 415)]:
+            with self.subTest(headers=headers):
+                connection = http.client.HTTPConnection(*self.server.server_address, timeout=2)
+                try:
+                    connection.request("POST", "/api/undo", b"{}", {
+                        "Content-Type": "application/json", "X-Auction-Token": self.token, **headers})
+                    response = connection.getresponse()
+                    self.assertEqual(response.status, expected)
+                    self.assertTrue(response.will_close)
+                    response.read()
+                finally:
+                    connection.close()
+        self.assertTrue(self.server.state.empty)
+
+    def test_non_loopback_bind_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "solo 127.0.0.1"):
+            AuctionWebServer(self.planner, self.server.state, self.state_path, "0.0.0.0", 0, self.token)
+
     def test_mutations_need_token_origin_and_content_type(self):
         body = {"player": "A Player1", "price": 5, "buyer": "io"}
         status, _ = self.call("POST", "/api/sale", body, token=None)
