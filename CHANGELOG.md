@@ -19,6 +19,30 @@
 - Remove a duplicated copy of this section that had overwritten the
   2026-08-24 heading further down.
 
+### Added (26 September 2026: local web console for the auction)
+
+- `scripts/live_auction_web.py`: single-page, mobile-friendly local console
+  serving the same `LivePlanner`, forecast and dossier as the CLI. Binds to
+  `127.0.0.1:<port>` (default 8765), serves page and JSON API from one
+  origin, accepts mutations only with the per-startup random token embedded
+  in the page plus the expected origin, caps request bodies, and answers
+  errors as JSON without stack traces. Endpoints: `/api/health`, `/api/plan`,
+  `/api/bid`, `/api/managers`, `/api/search`, `POST /api/sale`, `POST
+  /api/undo`.
+- `src/utils/state_lock.py::StateLock`: `fcntl` advisory lock on `<state>.lock`
+  so the interactive console and the web server can never write the auction
+  log at the same time; the CLI holds it for the whole session and exits
+  with a clear error when it is taken. On platforms without `fcntl`
+  acquisition fails loudly instead of allowing concurrent writers.
+- `src/models/live_auction.py` exposes `record_sale` and `undo_last`, the
+  shared validation layer for console `m`/`v`/`u` and web mutations (player
+  resolution, double sales, role slots, budgets, undo validity); the CLI
+  reuses them so both surfaces enforce identical rules.
+- Regression coverage: `tests/test_live_auction_web.py` drives the HTTP API
+  end to end on an ephemeral local port (sales by name and official id,
+  conflicts, undo, guard failures, oversized bodies, lock contention,
+  persisted-log restart, error serialization).
+
 ### Fixed (24 September 2026: league-list refresh)
 
 - The snapshot import report and auction dossier accept the date of the

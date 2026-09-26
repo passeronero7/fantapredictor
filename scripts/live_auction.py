@@ -42,9 +42,11 @@ from src.models.live_auction import (
     LivePlanner,
     manager_summary,
     read_state,
-    resolve_player,
+    record_sale,
     resolve_state,
+    undo_last,
 )
+from src.utils.state_lock import StateLock
 
 HELP = __doc__.split("Commands", 1)[1].split("\n", 1)[1].rsplit("Names with", 1)[0]
 
@@ -148,66 +150,71 @@ def main() -> None:
     args = parser.parse_args()
 
     planner = make_planner(args)
-    state = read_state(args.state)
-    resolve_state(state, planner.full)  # fail early on a bad log
-    print(f"stato: {len(state)} aggiudicazioni in {args.state}")
-    current = show_plan(planner, state)
+    # One writer at a time on the shared log: the web server and another
+    # console both fail here instead of interleaving their writes.
+    try:
+        state_lock = StateLock(args.state)
+        state_lock.acquire()
+    except RuntimeError as exc:
+        print(f"errore: {exc}")
+        sys.exit(1)
+    try:
+        state = read_state(args.state)
+        resolve_state(state, planner.full)  # fail early on a bad log
+        print(f"stato: {len(state)} aggiudicazioni in {args.state}")
+        current = show_plan(planner, state)
 
-    commands = iter(args.command) if args.command else None
-    while True:
-        try:
-            line = next(commands) if commands else input("\nasta> ")
-        except (EOFError, StopIteration):
-            break
-        try:
-            tokens = shlex.split(line)
-        except ValueError as exc:
-            print(f"errore: {exc}")
-            continue
-        if not tokens:
-            continue
-        verb, rest = tokens[0].lower(), tokens[1:]
-        try:
-            if verb in {"x", "exit", "quit"}:
+        commands = iter(args.command) if args.command else None
+        while True:
+            try:
+                line = next(commands) if commands else input("\nasta> ")
+            except (EOFError, StopIteration):
                 break
-            if verb in {"h", "help", "?"}:
-                print(HELP)
-            elif verb == "q":
-                show_bid(planner, state, " ".join(rest))
-            elif verb in {"m", "v"}:
-                sale = parse_sale(rest, verb == "m", args.me)
-                row = resolve_player(sale["giocatore"], planner.full)
-                sale["giocatore"] = planner.full.at[row, "player"]
-                candidate = pd.concat([state, pd.DataFrame([sale])], ignore_index=True)
-                # Validates double sales, slots per role and budgets.
-                manager_summary(resolve_state(candidate, planner.full), planner.me,
-                                planner.managers, planner.config.budget)
-                state = candidate
-                write_state(state, args.state)
-                print(f"registrato: {sale['giocatore']} a {sale['acquirente']} per {sale['prezzo']}")
-                current = show_plan(planner, state, current)
-            elif verb == "u":
-                if state.empty:
-                    print("niente da annullare")
-                    continue
-                last = state.iloc[-1]
-                state = state.iloc[:-1].reset_index(drop=True)
-                write_state(state, args.state)
-                print(f"annullato: {last['giocatore']} ({last['acquirente']}, {last['prezzo']})")
-                current = show_plan(planner, state, current)
-            elif verb == "p":
-                current = show_plan(planner, state, current)
-            elif verb == "b":
-                table = planner.plan_bids(state)
-                print(table[["player", "team", "role", "riferimento", "offerta_max",
-                             "motivo", "se_lo_perdi"]].to_string(index=False))
-            elif verb == "s":
-                print(manager_summary(resolve_state(state, planner.full), planner.me,
-                                      planner.managers, planner.config.budget).to_string(index=False))
-            else:
-                print(f"comando sconosciuto '{verb}' (h per l'aiuto)")
-        except (KeyError, ValueError) as exc:
-            print(f"errore: {exc.args[0] if exc.args else exc}")
+            try:
+                tokens = shlex.split(line)
+            except ValueError as exc:
+                print(f"errore: {exc}")
+                continue
+            if not tokens:
+                continue
+            verb, rest = tokens[0].lower(), tokens[1:]
+            try:
+                if verb in {"x", "exit", "quit"}:
+                    break
+                if verb in {"h", "help", "?"}:
+                    print(HELP)
+                elif verb == "q":
+                    show_bid(planner, state, " ".join(rest))
+                elif verb in {"m", "v"}:
+                    sale = parse_sale(rest, verb == "m", args.me)
+                    state, canonical = record_sale(planner, state, sale)
+                    write_state(state, args.state)
+                    print(f"registrato: {canonical['giocatore']} a {canonical['acquirente']} "
+                          f"per {canonical['prezzo']}")
+                    current = show_plan(planner, state, current)
+                elif verb == "u":
+                    if state.empty:
+                        print("niente da annullare")
+                        continue
+                    state, last = undo_last(planner, state)
+                    write_state(state, args.state)
+                    print(f"annullato: {last['giocatore']} ({last['acquirente']}, {last['prezzo']})")
+                    current = show_plan(planner, state, current)
+                elif verb == "p":
+                    current = show_plan(planner, state, current)
+                elif verb == "b":
+                    table = planner.plan_bids(state)
+                    print(table[["player", "team", "role", "riferimento", "offerta_max",
+                                 "motivo", "se_lo_perdi"]].to_string(index=False))
+                elif verb == "s":
+                    print(manager_summary(resolve_state(state, planner.full), planner.me,
+                                          planner.managers, planner.config.budget).to_string(index=False))
+                else:
+                    print(f"comando sconosciuto '{verb}' (h per l'aiuto)")
+            except (KeyError, ValueError) as exc:
+                print(f"errore: {exc.args[0] if exc.args else exc}")
+    finally:
+        state_lock.release()
 
 
 if __name__ == "__main__":

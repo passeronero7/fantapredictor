@@ -183,6 +183,39 @@ def market_factor(full: pd.DataFrame, sales: pd.DataFrame, managers: int, budget
 
 
 # ---------------------------------------------------------------------------
+# Shared console/web state writes
+# ---------------------------------------------------------------------------
+
+def record_sale(planner, state: pd.DataFrame, sale: dict) -> tuple[pd.DataFrame, dict]:
+    """Validate a candidate sale and return ``(new_state, canonical_sale)``.
+
+    The console and the web API share this so a sale is accepted or rejected
+    with the same rules in both places: the player must resolve in the pool,
+    the buyer's role slots and budget must hold, and nobody may be sold
+    twice. Nothing is written here; callers persist ``new_state`` with their
+    own atomic writer.
+    """
+    row = resolve_player(sale["giocatore"], planner.full)
+    canonical = dict(sale)
+    canonical["giocatore"] = planner.full.at[row, "player"]
+    candidate = pd.concat([state, pd.DataFrame([canonical])], ignore_index=True)
+    manager_summary(resolve_state(candidate, planner.full), planner.me,
+                    planner.managers, planner.config.budget)
+    return candidate, canonical
+
+
+def undo_last(planner, state: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Pop the last recorded sale after validating the resulting state."""
+    if state.empty:
+        raise ValueError("niente da annullare")
+    last = state.iloc[-1].to_dict()
+    candidate = state.iloc[:-1].reset_index(drop=True)
+    manager_summary(resolve_state(candidate, planner.full), planner.me,
+                    planner.managers, planner.config.budget)
+    return candidate, last
+
+
+# ---------------------------------------------------------------------------
 # Pruning
 # ---------------------------------------------------------------------------
 

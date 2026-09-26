@@ -108,6 +108,20 @@ python scripts/live_auction.py --forecast /path/to/forecast.csv \
 # asta> p / b / s / u     plan, all bids, managers, undo
 ```
 
+A mobile-friendly local web console serves the same planner on
+`http://127.0.0.1:8765` (from the private workspace: `bash scripts/asta.sh
+--web`):
+
+```bash
+python scripts/live_auction_web.py --forecast /path/to/forecast.csv \
+  --dossier-players /path/to/giocatori.csv --state /path/to/stato_asta.csv \
+  --me io --reserve 10 --defence-modifier --db $FANTAPREDICTOR_DATA_DIR/fantapredictor.db
+```
+
+Mutations require the per-startup token embedded in the page plus the
+expected origin; console and web share a `StateLock` on the state file, so
+only one process can write the log at a time.
+
 `optimize_auction_roster.py --state stato_asta.csv` writes the same residual
 plan, bids and manager table as files. See `docs/auction_refresh.md`
 ("Live auction").
