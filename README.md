@@ -4,18 +4,13 @@ An evidence-led probabilistic prediction and research engine for Serie A Fantaca
 
 ## Current state
 
-The 26 September 2026 audit and forecast corrections are documented in
-[`docs/auction_forecast_audit.md`](docs/auction_forecast_audit.md). The latest refresh is documented in
-[`docs/auction_refresh.md`](docs/auction_refresh.md). The private warehouse
+The 6 October 2026 in-season refresh, price calibration and weekly lineup advisory engine are documented in
+[`CHANGELOG.md`](CHANGELOG.md) and [`docs/auction_refresh.md`](docs/auction_refresh.md). The private warehouse
 holds all 380 scheduled fixtures, 1,590 observed ratings through matchday 5
-(complete), matchday-6 probable XIs, 598 quotations (matching the private
-league export by provider ID and quotation), 48 availability notices (38 with a
-return date translated from the source window) and 535 eligible players under
-the supplied 24 September league list. A dated coach history (2015/16-2026/27,
-including the Fiorentina and Bologna in-season changes) drives the coach
-conditioning of the forecast (`docs/coach_conditioning.md`). Dossier and
-roster outputs are transparent planning references, not approved neural
-predictions. Older snapshot counts elsewhere in the docs are historical.
+(complete), matchday-6 probable XIs, 600 quotations (with Obric and Neto censused),
+64 availability notices (46 with structured return dates derived), and all 200 completed
+league auction sales. A dated coach history (2015/16-2026/27) conditions forecasts,
+while home/away venue modulation and small-sample Bayesian shrinkage enhance propensity modeling.
 
 The codebase implements:
 - FBref manual-export validation and utility modules (`src/data_processing/`, `src/utils/`).
@@ -24,8 +19,11 @@ The codebase implements:
 - SQLite research warehouse with normalized schema (`src/db/`).
 - Weekly vote parsing and multi-source player merging (`src/data_processing/votes_processor.py`, `src/data_processing/players_processor.py`).
 - Match dataset preparation (`src/data_processing/match_data_builder.py`).
-- Probabilistic prediction with Sinh-Arcsinh (SHASH) distribution modeling expected fantasy points and upside/downside quantiles (`src/models/neural_network.py`, `src/models/distributions.py`), inspired by top-down probabilistic modeling concepts from USA fantasy football (`amiles2233/ff_prob`).
+- Probabilistic prediction with Sinh-Arcsinh (SHASH) distribution modeling expected fantasy points and quantiles (`src/models/neural_network.py`, `src/models/distributions.py`).
 - Monte Carlo lineup optimizer with formation constraints and Serie A *Modificatore Difesa* bonus calculations (`src/models/lineup_optimizer.py`).
+- In-season matchday lineup advisory engine (`scripts/recommend_lineup.py`) selecting optimal 11 starters and bench order for personal rosters.
+- Real-auction price calibration engine (`scripts/calibrate_auction_prices.py`) learning empirical FVM conversion parameters.
+- One-click unified weekly pipeline (`scripts/run_weekly_pipeline.py`).
 - Offline source ingestors and a reproducible SQLite builder (`scripts/build_database.py`).
 
 The current release is not yet an auction-ready prediction release. The active
@@ -73,6 +71,11 @@ python scripts/run_pipeline.py --stage train --season 2627
 python scripts/run_pipeline.py --stage predict --matchday 1 --season 2627
 python scripts/run_pipeline.py --stage lineup --matchday 1 --season 2627
 python scripts/evaluate_model.py --season 2425 --cutoffs 10,20,30
+
+# In-season weekly management and price calibration
+python scripts/run_weekly_pipeline.py --matchday 6
+python scripts/recommend_lineup.py --matchday 6 --defence-modifier
+python scripts/calibrate_auction_prices.py
 ```
 
 Auction run (from the public core, against the private workspace data):

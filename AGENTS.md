@@ -27,7 +27,7 @@ as was done for the unused `src/utils/file_io.py`).
 ## Working rules
 
 - Keep `README.md` and `CHANGELOG.md` authoritative.
-- Do not describe unimplemented pipeline stages as working. The codebase implements manual FBref export validation, Understat baseline downloading, empirical-Bayes player confidence scoring, SQLite relational warehouse (`src/db/`), vote processing (`VotesProcessor`), multi-source player merging (`PlayersProcessor`), match dataset preparation (`MatchDataBuilder`), probabilistic SinhArcsinh prediction (`FantacalcioPredictor`), and Monte Carlo lineup optimization (`LineupOptimizer`).
+- Do not describe unimplemented pipeline stages as working. The codebase implements manual FBref export validation, Understat baseline downloading, empirical-Bayes player confidence scoring, SQLite relational warehouse (`src/db/`), vote processing (`VotesProcessor`), multi-source player merging (`PlayersProcessor`), match dataset preparation (`MatchDataBuilder`), probabilistic SinhArcsinh prediction (`FantacalcioPredictor`), Monte Carlo lineup optimization (`LineupOptimizer`), matchday lineup advisory (`recommend_lineup.py`), auction price calibration (`calibrate_auction_prices.py`), and unified weekly pipeline execution (`run_weekly_pipeline.py`).
 - Use only confirmed transfers for the active roster dataset. Keep rumours in a separate watchlist and never merge them into eligible players.
 - Record a source URL and `checked_at` date for every roster or transfer assertion. The transfer market remains open until 1 September 2026, so refresh before every auction or model run.
 - Keep raw, source-derived data out of Git unless it is small and redistributable. Store generated exports in `data/` (ignored).
@@ -38,6 +38,7 @@ as was done for the unused `src/utils/file_io.py`).
 - Probabilistic modeling utilizes the Sinh-Arcsinh (SHASH) distribution to capture skewed, heavy-tailed fantasy scores, providing floor (q10), median (q50), and ceiling upside (q90) predictions alongside Monte Carlo matchday simulations.
 - Training must use observed vote/fantavoto targets only; never use the bootstrap roster as synthetic training data. Historical expanding features must not include the target matchday.
 - The lineup optimizer uses a 500-credit default budget, requires current player prices, and evaluates complete legal formations with correlated Monte Carlo draws and defence modifiers.
+- In-season matchday advisory (`scripts/recommend_lineup.py`) selects optimal 11 starters and bench ordering from the manager's real roster with availability and Defence Modifier probability modeling.
 - Security & IP protection: Maintain a Dual-Repository architecture (Public Core repo for algorithms and models, Private Workspace for raw data and personal league configs). Pre-commit hooks (`.githooks/pre-commit`) are enforced to block accidental commits of databases, spreadsheets, or credentials.
 - For every material change, update `CHANGELOG.md` and the relevant user-facing documentation, then stage and commit the coherent change set. Generated data and local environments remain untracked.
 
@@ -59,6 +60,11 @@ python scripts/optimize_auction_roster.py --forecast ... --dossier-players ... -
 python scripts/live_auction.py --forecast ... --dossier-players ... --state .../stato_asta.csv --me io --reserve 10 --defence-modifier
 python scripts/ingest_availability.py --csv .../availability_current.csv --derive-dates --as-of YYYY-MM-DD
 python scripts/ingest_coaches.py --csv .../coach_history.csv
+
+# In-season weekly operations
+python scripts/run_weekly_pipeline.py --matchday 6
+python scripts/recommend_lineup.py --matchday 6 --defence-modifier
+python scripts/calibrate_auction_prices.py
 ```
 
 ## Prediction strategy rules
@@ -81,6 +87,12 @@ python scripts/ingest_coaches.py --csv .../coach_history.csv
   transparent (empirical distributions + shrinkage) and backtested before any
   change to its estimates. Report propensity as a ranking metric: the
   documented 2025/26 calibration is monotone but overconfident in the top bin.
+- Calendar & venue modulation: when scheduled fixtures are provided,
+  `simulate_horizon` evaluates exact opponents and home/away venue terms
+  (`style_multiplier`), shifting offensive and defensive expectations accordingly.
+- Small-sample Bayesian shrinkage: players with <= 3 historical appearances
+  receive strengthened shrinkage towards the role-level prior to prevent isolated
+  outlier performances from distorting expectations.
 - Coach conditioning uses only curated, dated `coach_club_seasons` rows with
   source URLs (workspace `coaches/coach_history.csv`); never fabricate
   coaches, dates, modules or style tags. Record in-season changes with

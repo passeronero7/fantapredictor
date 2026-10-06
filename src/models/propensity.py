@@ -202,11 +202,30 @@ def player_propensity(
     )
 
     # Empirical-Bayes shrinkage toward the role prior.
+    # Small-sample regularization: for appearances <= 3, apply strengthened shrinkage
+    # to protect against noisy outlier performances.
     role_marks = profile["role"].map(role_prior_mark)
+    adaptive_shrinkage = shrinkage * np.where(profile["appearances"] <= 3, 2.0, 1.0)
     profile["p_good_mark"] = (
-        (profile["good_marks"] + shrinkage * role_marks)
-        / (profile["appearances"] + shrinkage)
+        (profile["good_marks"] + adaptive_shrinkage * role_marks)
+        / (profile["appearances"] + adaptive_shrinkage)
     ) + RECALIBRATION_OFFSET
+
+    # Regularize median vote for small samples towards role median prior
+    role_prior_vote = prior.groupby("role")["vote"].median()
+    role_prior_fanta = prior.groupby("role")["fantavoto"].median()
+    small_mask = profile["appearances"] <= 3
+    if small_mask.any():
+        apps = profile.loc[small_mask, "appearances"]
+        p_role_vote = profile.loc[small_mask, "role"].map(role_prior_vote)
+        p_role_fanta = profile.loc[small_mask, "role"].map(role_prior_fanta)
+        profile.loc[small_mask, "vote_median"] = (
+            apps * profile.loc[small_mask, "vote_median"] + 3.0 * p_role_vote
+        ) / (apps + 3.0)
+        profile.loc[small_mask, "fantavoto_median"] = (
+            apps * profile.loc[small_mask, "fantavoto_median"] + 3.0 * p_role_fanta
+        ) / (apps + 3.0)
+
     role_appearance_prior = profile.groupby("role")["appearance_rate_raw"].mean()
     profile["p_plays"] = (
         profile["appearances"] + shrinkage * profile["role"].map(role_appearance_prior) * 4
@@ -241,6 +260,8 @@ def style_multiplier(
     opponent_attack: float,
     opponent_defense: float,
     weight: float = 0.15,
+    is_home: bool | None = None,
+    home_advantage: float = 0.15,
 ) -> float:
     """Bonus-event multiplier from club style, by role.
 
@@ -248,12 +269,21 @@ def style_multiplier(
     defense; goalkeepers/defenders feed on their own defense and suffer the
     opponent's attack. Exponentiated z-combination keeps the effect
     multiplicative and centred on 1.
+
+    When ``is_home`` is specified, a home advantage term shifts expectations:
+    home sides generate more attacks and concede fewer goals/shots.
     """
     role = str(role).strip().upper()
+    venue_shift = 0.0
+    if is_home is True:
+        venue_shift = home_advantage
+    elif is_home is False:
+        venue_shift = -home_advantage
+
     if role in {"A", "C"}:
-        z = own_attack - opponent_defense
+        z = (own_attack - opponent_defense) + venue_shift
     elif role in {"P", "D"}:
-        z = own_defense - opponent_attack
+        z = (own_defense - opponent_attack) + venue_shift
     else:
         z = 0.0
     value = float(np.exp(weight * z))
@@ -391,6 +421,7 @@ def simulate_horizon(
     roles = propensity["role"].astype(str).to_numpy()
     teams = propensity["team"].astype(str).to_numpy()
     schedule = []
+    venues = []
     if fixtures is not None:
         for md in range(config.from_matchday, config.from_matchday + config.matchdays):
             games = fixtures[fixtures["matchday"].eq(md)]
@@ -400,6 +431,9 @@ def simulate_horizon(
             opponent_of = dict(zip(games["home"], games["away"]))
             opponent_of.update(zip(games["away"], games["home"]))
             schedule.append(opponent_of)
+            is_home_map = {club: True for club in games["home"]}
+            is_home_map.update({club: False for club in games["away"]})
+            venues.append(is_home_map)
     # Calculate each possible matchup once instead of a Python call per
     # player per draw. This preserves the existing style acceptance rule.
     matchup = {
@@ -409,9 +443,21 @@ def simulate_horizon(
             for i in range(n_players)
         ]) for club in clubs
     }
-    scheduled_multipliers = [np.array([matchup[opponents[team]][i]
-                                      for i, team in enumerate(teams)])
-                             for opponents in schedule]
+    scheduled_multipliers = [
+        np.array([
+            style_multiplier(
+                roles[i],
+                own_attack[i],
+                own_defense[i],
+                opp_attack[opponents[teams[i]]],
+                opp_defense[opponents[teams[i]]],
+                config.style_weight,
+                is_home=venues[md].get(teams[i]) if md < len(venues) else None,
+            )
+            for i in range(n_players)
+        ])
+        for md, opponents in enumerate(schedule)
+    ]
     for sim in range(config.simulations):
         horizon_marks = np.full((n_players, config.matchdays), np.nan)
         vote_marks = np.full((n_players, config.matchdays), np.nan)

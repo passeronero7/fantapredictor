@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Added (6 October 2026: in-season refresh, lineup advisory & modeling enhancements)
+
+- `scripts/recommend_lineup.py`: weekly matchday lineup advisory tool that optimizes 11 starters,
+  ordered bench and formation for the user's roster, integrating fresh probable lineups,
+  injury availability notes and Serie A defence modifier probabilities.
+- `scripts/calibrate_auction_prices.py`: Phase 3.4 price calibration tool learning empirical
+  conversion models (FVM/quotations to realized clearing prices) from all 200 league sales.
+- `scripts/run_weekly_pipeline.py`: automated one-click weekly maintenance pipeline executing
+  hot SQLite backup, snapshot ingestion, availability derivation, coach checks, and lineup advisory.
+- Venue-aware calendar simulation: `style_multiplier` and `simulate_horizon` in `src/models/propensity.py`
+  now track matchday home/away status and modulate bonus expectations accordingly.
+- Small-sample Bayesian regularization: strengthened shrinkage for players with <= 3 appearances,
+  regularizing both good-mark propensity and expected votes toward role priors.
+- `config/settings.py`: transparent automatic fallback for `FANTAPREDICTOR_DATA_DIR` discovering
+  workspace data directories when unset.
+- Warning resolution: filtered upstream NumPy 2.0 / Keras 3 `__array__` copy keyword deprecation.
+- Test suite expanded to 214 tests with 100% pass rate.
+
 ### Fixed (26 September 2026: web console final audit)
 
 - Handle browser connections independently with timeouts and closed responses,

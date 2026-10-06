@@ -9,7 +9,34 @@ import os
 
 # Project root directory
 PROJECT_ROOT = Path(__file__).parent.parent
-DATA_DIR = Path(os.environ.get("FANTAPREDICTOR_DATA_DIR", PROJECT_ROOT / "data")).expanduser()
+
+
+def _resolve_data_dir() -> Path:
+    env_dir = os.environ.get("FANTAPREDICTOR_DATA_DIR")
+    if env_dir:
+        return Path(env_dir).expanduser()
+
+    core_data = PROJECT_ROOT / "data"
+    if (core_data / "fantapredictor.db").exists():
+        return core_data
+
+    # Check common private workspace locations relative to core
+    workspace_candidates = [
+        PROJECT_ROOT.parent / "fantapredictor-workspace" / "data",
+        PROJECT_ROOT / "fantapredictor-workspace" / "data",
+        PROJECT_ROOT.parent / "data",
+    ]
+    for candidate in workspace_candidates:
+        if candidate.exists() and (
+            (candidate / "fantapredictor.db").exists()
+            or (candidate / "season_2026_27").exists()
+        ):
+            return candidate
+
+    return core_data
+
+
+DATA_DIR = _resolve_data_dir()
 
 
 class Config:

@@ -59,6 +59,12 @@ class FantacalcioPredictor:
     def _tf():
         """Import TensorFlow lazily so database and parsing tasks stay lightweight."""
         try:
+            import warnings
+            warnings.filterwarnings(
+                "ignore",
+                category=DeprecationWarning,
+                message=r".*__array__ implementation doesn't accept a copy keyword.*",
+            )
             import tensorflow as tf
         except ImportError as exc:
             raise RuntimeError("TensorFlow is required to train or serve the deep model") from exc

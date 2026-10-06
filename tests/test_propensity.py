@@ -110,6 +110,20 @@ class PlayerPropensityTests(unittest.TestCase):
         self.assertEqual(frame[frame["player_normalized"] == "star"][
             "vote_median"].iloc[0], 7.0)
 
+    def test_small_sample_median_is_regularized_towards_role_median(self):
+        ratings = build_ratings()
+        team_stats = build_team_stats()
+        # Add a player with only 1 appearance with an exceptional mark
+        ratings = pd.concat([ratings, pd.DataFrame([{
+            "player": "OneHitWonder", "player_normalized": "onehitwonder", "team": "Alpha",
+            "role": "A", "matchday": 1, "vote": 8.0, "fantavoto": 11.0,
+            "season": "2025/26",
+        }])], ignore_index=True)
+        frame = player_propensity(ratings, team_stats, "2025/26", 7).set_index("player_normalized")
+        # Raw vote is 8.0, but shrunk median must be pulled towards role prior (around 6.0)
+        self.assertLess(frame.at["onehitwonder", "vote_median"], 8.0)
+        self.assertGreater(frame.at["onehitwonder", "vote_median"], 6.0)
+
 
 class StyleMultiplierTests(unittest.TestCase):
     def test_attacker_gains_from_own_attack_and_weak_defense(self):
@@ -126,6 +140,13 @@ class StyleMultiplierTests(unittest.TestCase):
     def test_multiplier_is_capped(self):
         extreme = style_multiplier("A", 10.0, 0.0, 0.0, -10.0, weight=2.0)
         self.assertLessEqual(extreme, 2.0)
+
+    def test_home_advantage_shifts_multiplier(self):
+        neutral = style_multiplier("A", 0.0, 0.0, 0.0, 0.0)
+        home = style_multiplier("A", 0.0, 0.0, 0.0, 0.0, is_home=True)
+        away = style_multiplier("A", 0.0, 0.0, 0.0, 0.0, is_home=False)
+        self.assertGreater(home, neutral)
+        self.assertLess(away, neutral)
 
 
 class SimulateHorizonTests(unittest.TestCase):
