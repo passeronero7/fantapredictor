@@ -139,8 +139,11 @@ def attach_player_forecasts(
         forecast_df["player_normalized"] = forecast_df["player_normalized"].apply(normalize_name)
 
     if forecast_df is not None:
-        keep_cols = [c for c in ["player_normalized", "expected_fantavoto", "p_plays", "expected_vote", "p_good_mark"] if c in forecast_df.columns]
+        keep_cols = [c for c in ["player_normalized", "expected_fantavoto", "p_plays", "expected_vote", "horizon_median_vote", "p_good_mark"] if c in forecast_df.columns]
         df = df.merge(forecast_df[keep_cols], on="player_normalized", how="left")
+        if "horizon_median_vote" in df.columns:
+            if "expected_vote" not in df.columns or df["expected_vote"].isna().all():
+                df["expected_vote"] = df["horizon_median_vote"]
 
     # Defaults if missing
     if "expected_fantavoto" not in df.columns:
@@ -291,6 +294,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--roster", type=Path, help="Path to user roster CSV")
     parser.add_argument("--matchday", type=int, default=6, help="Target matchday (default: 6)")
+    parser.add_argument("--forecast", type=Path, help="Explicit propensity forecast CSV path")
     parser.add_argument("--defence-modifier", action="store_true", default=True, help="Include defence modifier bonus")
     parser.add_argument("--no-defence-modifier", action="store_false", dest="defence_modifier")
     parser.add_argument("--output", type=Path, help="Optional output JSON report path")
@@ -305,9 +309,12 @@ def main() -> None:
         if not roster_path.exists():
             roster_path = Path("asta/rosa_finale_2026_09_27.csv")
 
-    # Forecast file auto-detection (find latest)
-    forecast_candidates = sorted(season_dir.glob("outputs/auction_propensity_*.csv"))
-    forecast_path = forecast_candidates[-1] if forecast_candidates else None
+    # Forecast file auto-detection (find latest by modification time)
+    if args.forecast:
+        forecast_path = args.forecast
+    else:
+        forecast_candidates = sorted(season_dir.glob("outputs/auction_propensity_*.csv"), key=lambda p: p.stat().st_mtime)
+        forecast_path = forecast_candidates[-1] if forecast_candidates else None
 
     print(f"=== FantaPredictor: Formazione Consigliata Giornata {args.matchday} ===")
     print(f"Rosa: {roster_path}")
