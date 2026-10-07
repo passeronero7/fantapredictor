@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -245,22 +246,22 @@ def optimize_lineup_for_matchday(
             effective = p * fv + (1.0 - p) * (bench_p * bench_fv)
             exp_score += effective
 
-        # 3. Defence modifier bonus estimate
+        # 3. Defence modifier bonus estimate (Standard Fantacalcio thresholds)
+        # Calcolato su Portiere + migliori 3 Difensori:
+        # < 6.00: 0 pt | >= 6.00: +1 pt | >= 6.50: +3 pt | >= 7.00: +6 pt
         mod_bonus = 0.0
         if enable_defence_modifier and d_count >= 4:
             gk = starters_df[starters_df["role"] == "P"]
             defenders = starters_df[starters_df["role"] == "D"].sort_values("expected_vote", ascending=False)
             if not gk.empty and len(defenders) >= 3:
-                gk_vote = gk["expected_vote"].iloc[0]
-                best3_votes = defenders["expected_vote"].head(3).mean()
-                avg_def = (gk_vote + 3 * best3_votes) / 4.0
-                if avg_def > 7.0:
-                    mod_bonus = 3.0
-                elif avg_def > 6.5:
-                    mod_bonus = 1.0
-                elif avg_def > 6.25:
-                    # probabilistic expectation of crossing 6.5
-                    mod_bonus = round((avg_def - 6.25) / 0.25 * 0.7, 2)
+                gk_vote = float(gk["expected_vote"].iloc[0])
+                best3_votes = float(defenders["expected_vote"].head(3).mean())
+                avg_def = (gk_vote + 3.0 * best3_votes) / 4.0
+                sigma = 0.28
+                p60 = float(1.0 - stats.norm.cdf(6.0, loc=avg_def, scale=sigma))
+                p65 = float(1.0 - stats.norm.cdf(6.5, loc=avg_def, scale=sigma))
+                p70 = float(1.0 - stats.norm.cdf(7.0, loc=avg_def, scale=sigma))
+                mod_bonus = round(p60 + 2.0 * p65 + 3.0 * p70, 2)
 
         total_score = exp_score + mod_bonus
 
@@ -318,7 +319,7 @@ def main() -> None:
 
     print(f"=== FantaPredictor: Formazione Consigliata Giornata {args.matchday} ===")
     print(f"Rosa: {roster_path}")
-    print(f"Modificatore difesa: {'Attivo (+1 >6.5, +3 >7.0)' if args.defence_modifier else 'Disattivato'}")
+    print(f"Modificatore difesa: {'Attivo (>=6.0: +1, >=6.5: +3, >=7.0: +6)' if args.defence_modifier else 'Disattivato'}")
 
     roster = load_user_roster(roster_path)
     is_starter_map, injuries_map, matchups = load_matchday_context(data_dir, args.matchday)
