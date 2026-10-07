@@ -97,8 +97,9 @@ def load_matchday_context(
             exp = str(row.get("expected_return", ""))
             availability_notes[norm] = f"{kind}: {note} (rientro: {exp})"
 
-    # 3. Matchups from SQLite
+    # 3. Matchups & Tactical Interactions from SQLite
     real_db = db_path or (data_dir / "fantapredictor.db")
+    tactical_evals = {}
     if real_db.exists():
         try:
             with sqlite3.connect(f"file:{real_db}?mode=ro", uri=True) as conn:
@@ -118,10 +119,13 @@ def load_matchday_context(
                     h, a = fix["home_team"], fix["away_team"]
                     matchups[h] = {"opponent": a, "is_home": True}
                     matchups[a] = {"opponent": h, "is_home": False}
-        except Exception as e:
-            logger.warning(f"Could not load matches from DB: {e}")
 
-    return is_probable_starter, availability_notes, matchups
+                from src.models.tactical_matchups import evaluate_matchday_tactics
+                tactical_evals = evaluate_matchday_tactics(conn, "2026/27", matchday)
+        except Exception as e:
+            logger.warning(f"Could not load matches/tactics from DB: {e}")
+
+    return is_probable_starter, availability_notes, matchups, tactical_evals
 
 
 def attach_player_forecasts(
@@ -129,6 +133,7 @@ def attach_player_forecasts(
     forecast_path: Path | None,
     is_starter_map: dict[str, bool],
     injuries_map: dict[str, str],
+    tactical_evals: dict | None = None,
 ) -> pd.DataFrame:
     """Enrich roster players with expected votes, appearance probabilities, and risk."""
     df = roster.copy()
@@ -192,6 +197,25 @@ def attach_player_forecasts(
 
     df["p_play_adjusted"] = p_play_adjusted
     df["status_tag"] = status_tags
+
+    # Modulate with tactical matchups if available
+    tactical_mults = []
+    tactical_notes = []
+    for _, row in df.iterrows():
+        team = str(row.get("team", ""))
+        role = str(row.get("role", "")).upper()
+        t_mult = 1.0
+        t_note = ""
+        if tactical_evals and team in tactical_evals:
+            te = tactical_evals[team]
+            t_mult = te.role_multipliers.get(role, 1.0)
+            t_note = te.summary_note
+        tactical_mults.append(t_mult)
+        tactical_notes.append(t_note)
+
+    df["tactical_mult"] = tactical_mults
+    df["tactical_note"] = tactical_notes
+    df["expected_fantavoto"] = (df["expected_fantavoto"] * df["tactical_mult"]).round(2)
     return df
 
 
@@ -322,8 +346,8 @@ def main() -> None:
     print(f"Modificatore difesa: {'Attivo (>=6.0: +1, >=6.5: +3, >=7.0: +6)' if args.defence_modifier else 'Disattivato'}")
 
     roster = load_user_roster(roster_path)
-    is_starter_map, injuries_map, matchups = load_matchday_context(data_dir, args.matchday)
-    enriched = attach_player_forecasts(roster, forecast_path, is_starter_map, injuries_map)
+    is_starter_map, injuries_map, matchups, tactical_evals = load_matchday_context(data_dir, args.matchday)
+    enriched = attach_player_forecasts(roster, forecast_path, is_starter_map, injuries_map, tactical_evals=tactical_evals)
 
     result = optimize_lineup_for_matchday(enriched, enable_defence_modifier=args.defence_modifier)
 
@@ -334,7 +358,7 @@ def main() -> None:
     print(f"=================================================================\n")
 
     print("--- 11 TITOLARI CONSIGLIATI ---")
-    headers = f"{'Ruolo':<6} {'Giocatore':<20} {'Squadra':<12} {'Avversario':<18} {'Stato':<26} {'FV Atteso':<10}"
+    headers = f"{'Ruolo':<6} {'Giocatore':<20} {'Squadra':<12} {'Avversario':<18} {'Stato':<26} {'FV Atteso':<10} {'Tattica':<8}"
     print(headers)
     print("-" * len(headers))
     for _, p in result["starters"].iterrows():
@@ -343,7 +367,25 @@ def main() -> None:
         opp = match_info.get("opponent", "N/A")
         venue = " (C)" if match_info.get("is_home") else " (T)" if "is_home" in match_info else ""
         opp_str = f"vs {opp}{venue}" if opp != "N/A" else "N/A"
-        print(f"{p['role']:<6} {p['player']:<20} {team:<12} {opp_str:<18} {p['status_tag']:<26} {p['expected_fantavoto']:<10.2f}")
+        t_mult = p.get("tactical_mult", 1.0)
+        delta_t = t_mult - 1.0
+        t_str = f"{delta_t:+.1%}" if abs(delta_t) > 0.001 else "base"
+        print(f"{p['role']:<6} {p['player']:<20} {team:<12} {opp_str:<18} {p['status_tag']:<26} {p['expected_fantavoto']:<10.2f} {t_str:<8}")
+
+    # Print relevant tactical matchup notes
+    tactical_matches_seen = set()
+    t_notes = []
+    for _, p in result["starters"].iterrows():
+        t = str(p["team"])
+        if t in tactical_evals and t not in tactical_matches_seen:
+            tactical_matches_seen.add(t)
+            ev = tactical_evals[t]
+            t_notes.append(f"- {t} vs {ev.opponent} ({ev.coach} vs {ev.opponent_coach}): {ev.summary_note}")
+
+    if t_notes:
+        print("\n🧠 DETTAGLIO SCONTRI TATTICI & H2H ALLENATORI:")
+        for note in t_notes:
+            print(note)
 
     print("\n--- PANCHINA ORDINATA (Ordine di Subentro) ---")
     headers_b = f"{'Pos':<4} {'Ruolo':<6} {'Giocatore':<20} {'Squadra':<12} {'Stato':<26} {'FV Atteso':<10}"
