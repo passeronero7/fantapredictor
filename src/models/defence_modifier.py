@@ -74,6 +74,14 @@ def marginal_per_player(center: float, sd: float) -> float:
     return density / 4.0
 
 
+def expected_points(center: float, sd: float) -> float:
+    """E[modifier] when the GK + best-three average is normal(center, sd)."""
+    if sd <= 0:
+        return float(modifier_points(center))
+    return float(sum(value_step * norm.sf(threshold, loc=center, scale=sd)
+                     for threshold, value_step in _steps()))
+
+
 def _steps():
     previous = 0.0
     for threshold, value in THRESHOLDS:

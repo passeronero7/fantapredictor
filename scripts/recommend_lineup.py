@@ -17,15 +17,20 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from config.settings import config
+from src.models.defence_modifier import THRESHOLDS as MODIFIER_THRESHOLDS
+from src.models.defence_modifier import expected_points as expected_modifier_points
 from src.utils.name_matching import normalize_name
 
 logger = logging.getLogger(__name__)
+
+# Spread of the GK + best-three average around its expected value.
+MODIFIER_AVERAGE_SD = 0.28
+MODIFIER_LABEL = ", ".join(f"+{points:g} sopra {threshold:g}" for threshold, points in MODIFIER_THRESHOLDS)
 
 LEGAL_FORMATIONS = [
     (3, 4, 3),
@@ -270,9 +275,9 @@ def optimize_lineup_for_matchday(
             effective = p * fv + (1.0 - p) * (bench_p * bench_fv)
             exp_score += effective
 
-        # 3. Defence modifier bonus estimate (Standard Fantacalcio thresholds)
-        # Calcolato su Portiere + migliori 3 Difensori:
-        # < 6.00: 0 pt | >= 6.00: +1 pt | >= 6.50: +3 pt | >= 7.00: +6 pt
+        # 3. Defence modifier bonus estimate: league rule from
+        # src.models.defence_modifier (GK + best three defenders, strict
+        # thresholds: +1 above 6.5, +3 above 7.0).
         mod_bonus = 0.0
         if enable_defence_modifier and d_count >= 4:
             gk = starters_df[starters_df["role"] == "P"]
@@ -281,11 +286,7 @@ def optimize_lineup_for_matchday(
                 gk_vote = float(gk["expected_vote"].iloc[0])
                 best3_votes = float(defenders["expected_vote"].head(3).mean())
                 avg_def = (gk_vote + 3.0 * best3_votes) / 4.0
-                sigma = 0.28
-                p60 = float(1.0 - stats.norm.cdf(6.0, loc=avg_def, scale=sigma))
-                p65 = float(1.0 - stats.norm.cdf(6.5, loc=avg_def, scale=sigma))
-                p70 = float(1.0 - stats.norm.cdf(7.0, loc=avg_def, scale=sigma))
-                mod_bonus = round(p60 + 2.0 * p65 + 3.0 * p70, 2)
+                mod_bonus = round(expected_modifier_points(avg_def, MODIFIER_AVERAGE_SD), 2)
 
         total_score = exp_score + mod_bonus
 
@@ -343,7 +344,7 @@ def main() -> None:
 
     print(f"=== FantaPredictor: Formazione Consigliata Giornata {args.matchday} ===")
     print(f"Rosa: {roster_path}")
-    print(f"Modificatore difesa: {'Attivo (>=6.0: +1, >=6.5: +3, >=7.0: +6)' if args.defence_modifier else 'Disattivato'}")
+    print(f"Modificatore difesa: {'Attivo (' + MODIFIER_LABEL + ')' if args.defence_modifier else 'Disattivato'}")
 
     roster = load_user_roster(roster_path)
     is_starter_map, injuries_map, matchups, tactical_evals = load_matchday_context(data_dir, args.matchday)

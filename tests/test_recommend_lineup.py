@@ -58,6 +58,21 @@ class RecommendLineupTests(unittest.TestCase):
         self.assertIn("formation", result)
         self.assertGreater(result["expected_total_score"], 0)
 
+    def test_defence_modifier_uses_league_thresholds(self):
+        roster = load_user_roster(self.roster_file)
+        starters = {"maignan": True, "theo": True, "bastoni": True, "dimarco": True,
+                    "pavlovic": True}
+        enriched = attach_player_forecasts(roster, None, starters, {})
+        # GK + best three average of 6.25: 0 under the league rule
+        # (the generic +1/+3/+6 table would have paid about +1).
+        enriched["expected_vote"] = 6.25
+        result = optimize_lineup_for_matchday(enriched, enable_defence_modifier=True)
+        self.assertLess(result["expected_modifier_bonus"], 0.25)
+        enriched["expected_vote"] = 7.5
+        result = optimize_lineup_for_matchday(enriched, enable_defence_modifier=True)
+        self.assertGreater(result["expected_modifier_bonus"], 2.5)
+        self.assertLessEqual(result["expected_modifier_bonus"], 3.0)
+
 
 if __name__ == "__main__":
     unittest.main()

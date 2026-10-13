@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed (11 October 2026: lineup advisory defence modifier)
+
+- `scripts/recommend_lineup.py` scored the defence modifier with the generic
+  +1/+3/+6 table (from 6.0), overstating 4- and 5-defender formations. It now
+  uses the league rule in `src/models/defence_modifier.py` (GK + best three
+  defenders, +1 strictly above 6.5, +3 strictly above 7.0) through the new
+  `expected_points(center, sd)` helper; tests cover both thresholds.
+
 ### Added (6 October 2026: in-season refresh, lineup advisory & modeling enhancements)
 
 - `scripts/recommend_lineup.py`: weekly matchday lineup advisory tool that optimizes 11 starters,
