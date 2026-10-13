@@ -52,6 +52,18 @@ class TacticalMatchupTests(unittest.TestCase):
         self.assertGreater(delta, 0.0)
         self.assertIn("2V-0P-0S", summary)
 
+    def test_h2h_goals_conceded_metric_drives_defensive_delta(self):
+        # Coach A scores little but concedes a lot against Coach B.
+        mock_matches = pd.DataFrame([
+            {"home_coach": "Coach A", "away_coach": "Coach B", "home_goals": 0.0, "away_goals": 3.0},
+            {"home_coach": "Coach B", "away_coach": "Coach A", "home_goals": 3.0, "away_goals": 0.0},
+            {"home_coach": "Coach A", "away_coach": "Coach B", "home_goals": 1.0, "away_goals": 3.0},
+        ])
+        gf_delta, _, _ = compute_coach_h2h_delta(mock_matches, "Coach A", "Coach B", metric="gf")
+        ga_delta, _, _ = compute_coach_h2h_delta(mock_matches, "Coach A", "Coach B", metric="ga")
+        self.assertLess(gf_delta, 0.0)
+        self.assertGreater(ga_delta, 0.0)
+
     def test_evaluate_matchday_tactics_integration(self):
         # Create an in-memory SQLite database simulating clubs, coaches, seasons, matches
         conn = sqlite3.connect(":memory:")

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed (13 October 2026: coach head-to-head defensive adjustment)
+
+- `src/models/tactical_matchups.py`: goalkeeper and defender multipliers now use
+  the coach head-to-head goals *conceded* (`compute_coach_h2h_delta(metric="ga")`)
+  instead of the inverse of goals scored, so a fixture where a coach's side
+  historically concedes many goals lowers the defensive multiplier.
+
 ### Fixed (11 October 2026: lineup advisory defence modifier)
 
 - `scripts/recommend_lineup.py` scored the defence modifier with the generic

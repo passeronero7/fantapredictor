@@ -94,8 +94,12 @@ def compute_coach_h2h_delta(
     coach_a: str,
     coach_b: str,
     shrinkage: float = 4.0,
+    metric: str = "gf",
 ) -> Tuple[float, int, str]:
     """Compute empirical Bayes shrunk delta from historical clashes between two coaches.
+
+    Args:
+        metric: 'gf' for goals scored (attacks/midfielders), 'ga' for goals conceded (defence/goalkeeper).
 
     Returns:
         (shrunk_delta, match_count, summary)
@@ -143,8 +147,9 @@ def compute_coach_h2h_delta(
     mean_ga = float(np.mean(goals_against))
 
     # Baseline average in Serie A is ~1.3 goals per side per match
-    baseline_gf = 1.30
-    raw_delta = (mean_gf - baseline_gf) / baseline_gf
+    baseline = 1.30
+    target_metric = mean_ga if metric == "ga" else mean_gf
+    raw_delta = (target_metric - baseline) / baseline
 
     # Empirical Bayes shrinkage: pull toward zero with weight `shrinkage`
     shrunk_delta = (n_matches / (n_matches + shrinkage)) * raw_delta
@@ -243,13 +248,14 @@ def evaluate_matchday_tactics(
 
         # Evaluate Home vs Away
         h_style_delta = compute_style_delta(h_info["style_tags"], a_info["style_tags"])
-        h_h2h_delta, h_h2h_n, h_h2h_sum = compute_coach_h2h_delta(matches_with_coaches, h_info["coach"], a_info["coach"])
+        h_h2h_delta, h_h2h_n, h_h2h_sum = compute_coach_h2h_delta(matches_with_coaches, h_info["coach"], a_info["coach"], metric="gf")
+        h_h2h_ga_delta, _, _ = compute_coach_h2h_delta(matches_with_coaches, h_info["coach"], a_info["coach"], metric="ga")
 
         # Role multipliers for Home
         h_mults = {}
         for r in ROLES:
-            # Attacking roles get H2H goal boost; defenders get inverse
-            h2h_role_adj = h_h2h_delta if r in ("C", "A") else -h_h2h_delta * 0.5
+            # Attacking roles get H2H goal boost; defenders get inverse of goals conceded
+            h2h_role_adj = h_h2h_delta if r in ("C", "A") else -h_h2h_ga_delta * 0.5
             total_delta = h_style_delta.get(r, 0.0) + h2h_role_adj
             h_mults[r] = float(np.clip(1.0 + total_delta, 0.92, 1.08))
 
@@ -270,11 +276,12 @@ def evaluate_matchday_tactics(
 
         # Evaluate Away vs Home
         a_style_delta = compute_style_delta(a_info["style_tags"], h_info["style_tags"])
-        a_h2h_delta, a_h2h_n, a_h2h_sum = compute_coach_h2h_delta(matches_with_coaches, a_info["coach"], h_info["coach"])
+        a_h2h_delta, a_h2h_n, a_h2h_sum = compute_coach_h2h_delta(matches_with_coaches, a_info["coach"], h_info["coach"], metric="gf")
+        a_h2h_ga_delta, _, _ = compute_coach_h2h_delta(matches_with_coaches, a_info["coach"], h_info["coach"], metric="ga")
 
         a_mults = {}
         for r in ROLES:
-            h2h_role_adj = a_h2h_delta if r in ("C", "A") else -a_h2h_delta * 0.5
+            h2h_role_adj = a_h2h_delta if r in ("C", "A") else -a_h2h_ga_delta * 0.5
             total_delta = a_style_delta.get(r, 0.0) + h2h_role_adj
             a_mults[r] = float(np.clip(1.0 + total_delta, 0.92, 1.08))
 
