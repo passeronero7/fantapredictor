@@ -95,6 +95,29 @@ class TacticalMatchupTests(unittest.TestCase):
         self.assertGreaterEqual(alpha_ev.role_multipliers["C"], 0.92)
         self.assertLessEqual(alpha_ev.role_multipliers["C"], 1.08)
 
+    def test_evaluate_matchday_tactics_accepts_coach_without_tags(self):
+        # A newly appointed coach is recorded without module or style tags.
+        conn = sqlite3.connect(":memory:")
+        conn.executescript("""
+            CREATE TABLE seasons (id INTEGER PRIMARY KEY, name TEXT);
+            CREATE TABLE clubs (id INTEGER PRIMARY KEY, name TEXT);
+            CREATE TABLE coaches (id INTEGER PRIMARY KEY, full_name TEXT, preferred_module TEXT, style_tags TEXT);
+            CREATE TABLE coach_club_seasons (id INTEGER PRIMARY KEY, season_id INTEGER, club_id INTEGER, coach_id INTEGER, started_at TEXT, ended_at TEXT);
+            CREATE TABLE matches (id INTEGER PRIMARY KEY, season_id INTEGER, matchday INTEGER, match_date TEXT, home_club_id INTEGER, away_club_id INTEGER, home_goals REAL, away_goals REAL);
+
+            INSERT INTO seasons VALUES (1, '2026/27');
+            INSERT INTO clubs VALUES (1, 'Alpha'), (2, 'Beta');
+            INSERT INTO coaches VALUES (1, 'Coach Alpha', NULL, NULL);
+            INSERT INTO coaches VALUES (2, 'Coach Beta', NULL, NULL);
+            INSERT INTO coach_club_seasons VALUES (1, 1, 1, 1, '2026-07-01', NULL);
+            INSERT INTO coach_club_seasons VALUES (2, 1, 2, 2, '2026-07-01', NULL);
+            INSERT INTO matches VALUES (1, 1, 6, '2026-10-11', 1, 2, NULL, NULL);
+        """)
+
+        evals = evaluate_matchday_tactics(conn, "2026/27", 6)
+        self.assertEqual(evals["Alpha"].style_tags, [])
+        self.assertEqual(evals["Beta"].role_multipliers["C"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

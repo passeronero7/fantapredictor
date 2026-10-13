@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed (13 October 2026: coaches without style tags)
+
+- `evaluate_matchday_tactics` failed on a coach recorded without module or
+  style tags (SQL NULL read as NaN), which silently disabled every tactical
+  adjustment in `recommend_lineup.py`. Empty values now fall back to the
+  default module and no tags.
+
 ### Fixed (13 October 2026: coach head-to-head defensive adjustment)
 
 - `src/models/tactical_matchups.py`: goalkeeper and defender multipliers now use

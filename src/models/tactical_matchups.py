@@ -188,10 +188,14 @@ def evaluate_matchday_tactics(
     )
     coach_info = {}
     for _, r in coaches_df.iterrows():
+        # Curated rows may leave module or style tags empty (never invented);
+        # SQL NULLs arrive as None or NaN depending on the column's contents.
+        module = r["preferred_module"]
+        tags = r["style_tags"]
         coach_info[r["club"]] = {
             "coach": r["coach"],
-            "module": r["preferred_module"] or "4-3-3",
-            "style_tags": [t.strip() for t in (r["style_tags"] or "").split("|") if t.strip()],
+            "module": module if isinstance(module, str) and module.strip() else "4-3-3",
+            "style_tags": [t.strip() for t in tags.split("|") if t.strip()] if isinstance(tags, str) else [],
         }
 
     # 2. Preload historical matches and coach stints once
