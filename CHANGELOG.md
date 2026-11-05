@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add a read-only model-readiness inventory of rating coverage, match results and model bundle presence. It never promotes a model.
+
+
 ### Documentation (5 November 2026)
 
 - Add an implementation masterplan for executable model bundles, multi-window player/team/coach form, availability proxies, external model candidates and chronological promotion gates. No runtime behavior changed.
