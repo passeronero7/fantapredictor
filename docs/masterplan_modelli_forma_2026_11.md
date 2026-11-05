@@ -152,7 +152,7 @@ Aggiornamento del 5 novembre 2026. Questo registro sostituisce interpretazioni d
 
 | Fase | Stato effettivo | Evidenza disponibile | Lavoro necessario per chiuderla |
 |---|---|---|---|
-| P0 | Parziale | `audit_model_readiness.py`, esecuzione sul warehouse e test; nessun bundle storico completo | Conteggi minuti/convocati, provider e duplicati; inventario di tutte le fonti xG, non solo colonne matches |
+| P0 | Parziale | `audit_model_readiness.py` e `inventory_form_data.py`: snapshot SQLite con hash, conteggi per stagione/provider e possibili duplicati; nessun bundle storico completo | Inventario fonti e file grezzi xG/news, copertura minuti per partita e denominatore convocati |
 | P1 | Fondazione implementata | `form_features.visible_history`: cutoff, revisioni, timestamp obbligatori e duplicati ambigui rifiutati | Adattatori warehouse, acquisizione con available_at reale e identità temporali; replay rinvii e trasferimenti |
 | P2 | Fondazione implementata | `form_snapshot`: 3/5/10/20 eventi/presenze, EWMA, delta5–20, carico 7/14/28; `readiness_snapshot`: evidenza non scaduta e attribuita | Dataset denominatore eleggibili, aggregati squadra/allenatore, stime minuti calibrate e ablation |
 | P3 | Fondazione implementata | `research_store`: pubblicazione bundle immutabile, hash e verifica; SHASH save/load già esistente | Collegare registry al loader SHASH; provenienza completa, round-trip in processo nuovo e pesi su dati reali; candidato CatBoost |
@@ -196,3 +196,7 @@ Il piano progettuale è ora completo di backlog, contratti, dipendenze e criteri
 ### 10.4 Verifica di questo aggiornamento
 
 Test mirati delle nuove utility e audit passati; suite completa `python -m pytest -q` terminata con exit code 0. `git diff --check` e compilazione dei tre moduli completati. Questi controlli verificano il codice, non chiudono i gate predittivi P4/P6. Nessun nuovo modello addestrato o approvato in questo aggiornamento.
+
+### 10.5 Inventario esteso
+
+`inventory_form_data.py` acquisisce una copia SQLite consistente, incluso WAL, e ne registra SHA-256. I conteggi sono per provider e stagione e includono minuti/xG stagionali, voti, statistiche squadra, note di disponibilità e potenziali duplicati. Sono conteggi di righe, non indicano freschezza, osservabilità storica o qualità dell’abbinamento. Restano da inventariare i file grezzi e le fonti esterne; D01 rimane parziale.

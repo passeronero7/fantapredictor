@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add consistent SQLite-snapshot inventory with per-provider seasonal statistics, match data coverage and duplicate diagnostics.
+
+
 ### Research infrastructure
 
 - Add point-in-time revision filtering, multiscale form snapshots, sourced availability snapshots, immutable hashed research bundles and exclusive prospective shadow records.
