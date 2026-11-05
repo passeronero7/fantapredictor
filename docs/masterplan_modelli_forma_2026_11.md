@@ -200,3 +200,11 @@ Test mirati delle nuove utility e audit passati; suite completa `python -m pytes
 ### 10.5 Inventario esteso
 
 `inventory_form_data.py` acquisisce una copia SQLite consistente, incluso WAL, e ne registra SHA-256. I conteggi sono per provider e stagione e includono minuti/xG stagionali, voti, statistiche squadra, note di disponibilità e potenziali duplicati. Sono conteggi di righe, non indicano freschezza, osservabilità storica o qualità dell’abbinamento. Restano da inventariare i file grezzi e le fonti esterne; D01 rimane parziale.
+
+### 10.6 Acquisizione e simulazione con trend
+
+Nuova raccolta privata validata: 26.990 record giocatore-partita e 860 match con voti, ID e date riconciliati. Dati squadra Football-Data, archivi Wyscout/StatsBomb e storico Understat restano separati per provider e competizione. Nessuna sovrascrittura del warehouse; il limite convocati e la disponibilità storica delle notizie restano aperti.
+
+Completato un esperimento privato di simulazione con feature cronologiche di voto/fantavoto/minuti sulle ultime 3/5/10/20 presenze e forma squadra/avversario 5/10/20 partite. Ridge con scaling e imputazione appresi nel training; selezione della penalizzazione su un segmento successivo e valutazione su dieci giornate tenute separate. Successivo refit sui risultati disponibili per lo scenario corrente. La correzione delle medie campionate è limitata a un punto per controllare l'esperimento, non è un peso validato per il rilascio. Il confronto usa 2.000 estrazioni di selezione e 30.000 indipendenti di valutazione, stessi seed fra scenari. Il contesto allenatore del motore empirico è conservato; non si attribuisce efficacia a un nuovo modello allenatore né a una misura clinica della condizione fisica. L'esperimento non chiude P3–P6 o il gate di promozione.
+
+Verifiche dell’esperimento: 14 varianti di formazione valutate; caricamento indipendente dei pesi Ridge numerici con errore massimo nullo sulle predizioni salvate; split storico senza sovrapposizione fra fine training e inizio test. MAE fantavoto 0,8646 contro 0,8970 della baseline ultime 20 presenze su 3.156 osservazioni/100 match/10 giornate. Il confronto non sostituisce i gate completi del masterplan.

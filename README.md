@@ -8,6 +8,8 @@ See the [executable-model and multi-window form masterplan](docs/masterplan_mode
 
 The first implementation step is a read-only [model readiness inventory](scripts/audit_model_readiness.py). It reports coverage and bundle presence; it does not validate or approve a model. The extended [data inventory](scripts/inventory_form_data.py) fingerprints a consistent SQLite snapshot and reports coverage per provider.
 
+A dated private acquisition now reconciles official votes and participation records for three seasons. A separate exploratory trend simulation compares chronological player/team features with the existing empirical engine; it does not change the production model approval gate. See the masterplan implementation ledger.
+
 ## Current state
 
 The 6 October 2026 in-season refresh, price calibration and weekly lineup advisory engine are documented in

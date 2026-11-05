@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Research documentation
+
+- Record the validated private acquisition and exploratory chronological trend simulation, including nominal-minute limitations and the unchanged statistical promotion gate.
+
 ### Added
 
 - Add consistent SQLite-snapshot inventory with per-provider seasonal statistics, match data coverage and duplicate diagnostics.
