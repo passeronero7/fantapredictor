@@ -12,13 +12,14 @@ A dated private acquisition now reconciles official votes and participation reco
 
 ## Current state
 
-The 6 October 2026 in-season refresh, price calibration and weekly lineup advisory engine are documented in
-[`CHANGELOG.md`](CHANGELOG.md) and [`docs/auction_refresh.md`](docs/auction_refresh.md). The private warehouse
-holds all 380 scheduled fixtures, 1,590 observed ratings through matchday 5
-(complete), matchday-6 probable XIs, 600 quotations (with Obric and Neto censused),
-64 availability notices (46 with structured return dates derived), and all 200 completed
-league auction sales. A dated coach history (2015/16-2026/27) conditions forecasts,
-while home/away venue modulation and small-sample Bayesian shrinkage enhance propensity modeling.
+As of 5 November 2026, the core includes temporal feature utilities, sourced
+readiness snapshots, hashed research bundles, prospective shadow storage and
+read-only coverage inventories. Their integration and promotion gates are
+tracked in the [masterplan](docs/masterplan_modelli_forma_2026_11.md).
+The private operational warehouse has ratings through matchday 10. A separate
+research acquisition reconciles 26,990 player-match records over 860 fixtures;
+its original files and private configurations remain outside this public core.
+The exploratory Ridge comparison is not an approved production model.
 
 The codebase implements:
 - FBref manual-export validation and utility modules (`src/data_processing/`, `src/utils/`).
@@ -34,21 +35,16 @@ The codebase implements:
 - One-click unified weekly pipeline (`scripts/run_weekly_pipeline.py`).
 - Offline source ingestors and a reproducible SQLite builder (`scripts/build_database.py`).
 
-The current release is not yet an auction-ready prediction release. The active
-post-deadline 2026/27 snapshot checked at 21:32 CEST on 1 September contains
-288 confirmed, 558 watchlist, and 15 excluded memberships and passes the legal
-default 3-4-3 roster gate. The SHASH model is implemented and evaluated, but
-the leakage-safe 2024/25 walk-forward study still shows the expanding-prior and
-global-median baselines outperforming it. See the
-[evaluation record](docs/evaluation_results.md) and
-[operations runbook](docs/operations_runbook.md).
+The SHASH network has save/load support, but the documented historical
+walk-forward evaluation did not beat the baselines. Production predictions
+retain labelled fallback behavior until a candidate passes chronological and
+calibration gates. The new research trend utilities and experiment do not
+establish that gate has passed. See the [evaluation record](docs/evaluation_results.md)
+and [operations runbook](docs/operations_runbook.md).
 
-The 2026/27 roster research remains a live dataset rather than frozen truth;
-the summer-market closure snapshot was taken after 20:00 CEST on 1 September
-2026 and should still be refreshed for official corrections and the winter
-window. The current competition population includes Venezia and excludes
-relegated Verona. See the [scouting brief](docs/season_2026_27_roster_scouting.md)
-for the roster policy, club population, and source hierarchy.
+Dated September/October snapshots in older documents are historical evidence,
+not current source freshness. The private workspace README is authoritative
+for operational data dates and league reconciliation.
 
 ## Setup
 
