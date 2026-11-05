@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Documentation (5 November 2026)
+
+- Add an implementation masterplan for executable model bundles, multi-window player/team/coach form, availability proxies, external model candidates and chronological promotion gates. No runtime behavior changed.
+
 ### Fixed (13 October 2026: coaches without style tags)
 
 - `evaluate_matchday_tactics` failed on a coach recorded without module or

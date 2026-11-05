@@ -2,6 +2,10 @@
 
 An evidence-led probabilistic prediction and research engine for Serie A Fantacalcio 2026/27.
 
+## Modelling roadmap
+
+See the [executable-model and multi-window form masterplan](docs/masterplan_modelli_forma_2026_11.md) (5 November 2026). This is a proposed implementation and validation plan, not a released feature.
+
 ## Current state
 
 The 6 October 2026 in-season refresh, price calibration and weekly lineup advisory engine are documented in
