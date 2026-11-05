@@ -44,3 +44,9 @@ data/**/manual/
 .vscode/
 *.zip
 *.tar.gz
+
+# Rebuildable caches and operating-system residues
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+Thumbs.db

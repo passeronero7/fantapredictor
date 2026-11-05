@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Maintenance
+
+- Ignore additional rebuildable tooling caches and operating-system metadata; refresh the README to distinguish current research utilities from historical snapshots.
+
+
 ### Research documentation
 
 - Record the validated private acquisition and exploratory chronological trend simulation, including nominal-minute limitations and the unchanged statistical promotion gate.
