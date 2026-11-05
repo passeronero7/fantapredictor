@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Research infrastructure
+
+- Add point-in-time revision filtering, multiscale form snapshots, sourced availability snapshots, immutable hashed research bundles and exclusive prospective shadow records.
+- Complete the modelling masterplan with an implementation ledger, ordered backlog, data contracts and evidence required for release. New utilities do not promote models or change lineup advice.
+
 ### Added
 
 - Add a read-only model-readiness inventory of rating coverage, match results and model bundle presence. It never promotes a model.

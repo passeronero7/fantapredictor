@@ -4,7 +4,7 @@ An evidence-led probabilistic prediction and research engine for Serie A Fantaca
 
 ## Modelling roadmap
 
-See the [executable-model and multi-window form masterplan](docs/masterplan_modelli_forma_2026_11.md) (5 November 2026). This is a proposed implementation and validation plan, not a released feature.
+See the [executable-model and multi-window form masterplan](docs/masterplan_modelli_forma_2026_11.md) (5 November 2026). The plan includes a verified implementation ledger and the remaining acceptance criteria. Research utilities now provide point-in-time history filtering, multi-window snapshots, sourced readiness evidence, hashed bundles and prospective shadow storage; they are not yet wired into operational lineup advice.
 
 The first implementation step is a read-only [model readiness inventory](scripts/audit_model_readiness.py). It reports coverage and bundle presence; it does not validate or approve a model.
 

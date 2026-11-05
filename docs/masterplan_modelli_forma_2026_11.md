@@ -1,6 +1,6 @@
 # Masterplan: modelli eseguibili e forma multiscala
 
-Data: 5 novembre 2026. Stato: progetto di implementazione, non funzionalità rilasciata.
+Data: 5 novembre 2026. Stato: masterplan aggiornato con avanzamento verificabile; implementazione avviata, criteri di rilascio ancora da soddisfare.
 Obiettivo: produrre distribuzioni riproducibili di presenza, minuti, voto e fantavoto per la prossima partita e usarle in un unico simulatore di formazione, con forma individuale, squadra, allenatore e disponibilità documentata.
 Completamento: bundle caricabile in processo nuovo, replay senza informazioni future, backtest e calibrazione superati, formazione legale riproducibile e confronto con baseline. Un modello addestrato ma non validato resta NON PROMUOVIBILE.
 
@@ -144,3 +144,55 @@ Test mirati: futuro aggiunto non cambia feature del passato; pubblicazione tardi
 Per implementazioni: suite core richiesta da AGENTS, gate release e validazione datata con dati reali locali; nessuna rete nei test unitari. Aggiornare README/CHANGELOG e documentazione di modello. Artefatti e dati privati esclusi dal core pubblico. Attivazione esplicita della versione validata con rollback alla precedente; niente riaddestramento/promozione silenziosa o invio automatico di formazioni.
 
 Deliverable finale per l'utente: XI e panchina, alternative a modulo fisso, fonti/freschezza, modello per giocatore, motivazioni di forma e disponibilità, intervalli condizionati, confronto baseline e limiti. Se i dati non consentono di stimare condizione fisica o trend, dichiararlo nella riga del giocatore.
+
+
+## 10. Avanzamento verificato e backlog eseguibile
+
+Aggiornamento del 5 novembre 2026. Questo registro sostituisce interpretazioni del tipo “fase completata perché esiste il file”. Il completamento del piano progettuale non implica completamento dell'implementazione o promozione del modello.
+
+| Fase | Stato effettivo | Evidenza disponibile | Lavoro necessario per chiuderla |
+|---|---|---|---|
+| P0 | Parziale | `audit_model_readiness.py`, esecuzione sul warehouse e test; nessun bundle storico completo | Conteggi minuti/convocati, provider e duplicati; inventario di tutte le fonti xG, non solo colonne matches |
+| P1 | Fondazione implementata | `form_features.visible_history`: cutoff, revisioni, timestamp obbligatori e duplicati ambigui rifiutati | Adattatori warehouse, acquisizione con available_at reale e identità temporali; replay rinvii e trasferimenti |
+| P2 | Fondazione implementata | `form_snapshot`: 3/5/10/20 eventi/presenze, EWMA, delta5–20, carico 7/14/28; `readiness_snapshot`: evidenza non scaduta e attribuita | Dataset denominatore eleggibili, aggregati squadra/allenatore, stime minuti calibrate e ablation |
+| P3 | Fondazione implementata | `research_store`: pubblicazione bundle immutabile, hash e verifica; SHASH save/load già esistente | Collegare registry al loader SHASH; provenienza completa, round-trip in processo nuovo e pesi su dati reali; candidato CatBoost |
+| P4 | Da implementare per il nuovo motore | Evaluation storico preesistente e baseline; nessun nuovo risultato predittivo dichiarato | Backtest multiscala con tuning interno, protocolli congelati, bootstrap a blocchi, correzioni multiple e calibrazione |
+| P5 | Da implementare | Simulatore e advisory esistenti | Adattatore predizioni condiviso, dipendenze voto/bonus, regole panchina/Switch e test di parità |
+| P6 | Registro implementato; raccolta futura da avviare | `record_shadow`: timestamp reale, deadline futura e creazione esclusiva | Collegamento alla pipeline; previsioni reali archiviate prima delle partite, scoring post-voti, almeno 6–8 turni e gate statistici |
+| P7 | Opzionale, differito | Shortlist con fonti primarie nel piano | Benchmark isolato e provenienza pesi, solo dopo baseline/P4 |
+
+I test dei nuovi componenti usano entità anonime e verificano proprietà temporali, missing distinti da zero, integrità, scadenza e impossibilità di riscrivere lo shadow. Non costituiscono evidenza di accuratezza statistica. Le API sono componenti di ricerca e non sono ancora collegate automaticamente ai consigli operativi.
+
+### 10.1 Sequenza di implementazione vincolante
+
+1. **D01 — audit esteso.** Arricchire P0 con schema e copertura per stagione/provider di minuti, xG e news. Produrre `data_inventory.json` con hash DB e file analizzati. Non inferire copertura globale da una sola tabella.
+2. **D02 — adattatori e raccolta.** Definire record JSONL di evidenza con entity/event ID, club e gestione datati, event_time, observed_at, available_at, fonte/hash, revisione, scadenza e unità. Il tempo di acquisizione odierno non può diventare una falsa pubblicazione storica. Deduplicare per identità fonte-evento-revisione. Import idempotente e nessuna modifica distruttiva del warehouse.
+3. **D03 — denominatore.** Costruire giocatore-partita eleggibile da membership e tabellini, con target separati convocato/titolare/minuti/voto. Escludere dal training di una testa le etichette ignote; non trasformarle in zero. Rendere esplicite coppe e nazionali mancanti.
+4. **F01 — feature comuni.** Collegare i record validi alle funzioni esistenti; aggregazioni per giocatore, squadra e gestione allenatore. La stessa API può riepilogare metriche squadra/allenatore, ma gruppi, metriche e denominatori devono essere preparati dagli adattatori. Nessuna proprietà personale va sommata come fosse dato squadra. Collegare avversario al kickoff corretto.
+5. **F02 — residuali e caratteristiche.** Fit sul solo training di forza calendario, baseline ruolo e regressione minuti; residui out-of-fold cronologici per le feature. Statistiche per90 regolarizzate, media stagionale e stagione precedente, stabilità modulo/XI. Caratteristiche esterne solo se migliorano OOS, altrimenti peso zero.
+6. **M01 — bundle SHASH.** Addestrare un candidato esplicito, salvare `.keras` e scaler, pubblicare con registry e verificarne hash e predizioni in processo separato. Il manifest `trained` non abilita l'uso operativo. Un gate distinto registra valutazione e ambito; il loader deve rifiutare path esterni e artefatti corrotti prima del caricamento.
+7. **M02 — candidato tabellare.** Testare disponibilità CatBoost in ambiente isolato, fissare versione e licenza; usare encoding/missing e feature identici nel training/inferenza. Se i dati non supportano le teste convocazione/minuti, produrre un report esplicito di testa non addestrabile. Nessuna probabilità sintetica.
+8. **E01 — backtest e calibrazione.** Congelare `evaluation_protocol.json` prima dei risultati: split con timestamp/ID, dataset hash, feature, seed, griglia, budget, metrica primaria, baseline, numero confronti, soglie e blocchi bootstrap. Nessun test scelto dopo aver visto il vincitore.
+9. **S01 — contratto simulatore.** `PredictionBatch` versionato con cutoff, model ID/source, entità, probabilità calibrate quando disponibili, campioni congiunti voto/fantavoto e stato assente distinto. Validare dimensioni, valori finiti, role IDs e scoring; consentire un fallback dichiarato per ogni entità.
+10. **O01 — raccolta e scoring shadow.** Registrare il batch prima della deadline usando `record_shadow`; associare hash input e bundle. Salvare risultati ufficiali e scoring in artefatti separati: la previsione originaria resta immutabile. Eseguire una sola volta per run ID, senza timer o invii automatici.
+11. **R01 — rilascio verificato.** Suite core, regression temporali, smoke su dati reali, gate datato, benchmark runtime e report confronto; attivare solo un candidato che supera P4/P6. Se nessuno vince, completamento tecnico con baseline operativa e candidati NON PROMUOVIBILI.
+
+### 10.2 Contratti minimi dei deliverable mancanti
+
+- `data_inventory.json`: input hash, tabelle/provider esaminati, stagioni, target presenti/ignoti, identità non riconciliate e limiti. Conteggi per fonte non sommati senza deduplica.
+- `feature_manifest.json`: nomi/dtype/unità, gruppo e finestra, cutoff, campione/copertura, regole missing/prior, versione generatore e origine. `events_lastN` è la finestra di partite eleggibili solo se il denominatore è completo.
+- `bundle/manifest.json`: pesi/scaler/feature, hash, schema, cutoff, codice, ambiente e stato iniziale trained. L'attuale registry verifica hash e immutabilità; deve essere esteso con validazione semantica e percorso di approvazione documentato prima dell'uso operativo.
+- `evaluation_protocol.json` e `evaluation_report.json`: disegno congelato e risultati distinti, record delle prove fallite, report per coorte e ragione di NON PROMUOVIBILITÀ. I record di test non possono essere riutilizzati nel tuning dello stesso esperimento.
+- `shadow/<run_id>.json`: registrazione reale prima di cutoff, batch predittivo, fonti/hash e modello. Lo store implementato impone deadline e unicità; verifica della struttura di PredictionBatch e scoring sono attività S01/O01.
+
+### 10.3 Accettazione finale e dipendenze esterne
+
+Per dichiarare completa l'implementazione occorre chiudere D01–R01 con comando, exit code, conteggi e percorsi degli artefatti nel workspace. Lo stato di ogni fase deve indicare `implemented`, `validated`, `waiting_for_observations` o `not_implemented`; evitare una percentuale aggregata che confonda codice e dati.
+
+Dipendenze che il codice non può creare retroattivamente: pubblicazione storica delle news, minuti mancanti, denominatore convocati, copertura coppe/nazionali e nuove giornate shadow. Per ciascuna registrare fonte mancante, periodo e target coinvolto; usare baseline o limitare l'ambito del candidato. L'attesa prospettica non autorizza a dichiarare passata una validazione non ancora osservata.
+
+Il piano progettuale è ora completo di backlog, contratti, dipendenze e criteri di uscita. Il registro sopra resta la fonte dello stato d'implementazione.
+
+### 10.4 Verifica di questo aggiornamento
+
+Test mirati delle nuove utility e audit passati; suite completa `python -m pytest -q` terminata con exit code 0. `git diff --check` e compilazione dei tre moduli completati. Questi controlli verificano il codice, non chiudono i gate predittivi P4/P6. Nessun nuovo modello addestrato o approvato in questo aggiornamento.
